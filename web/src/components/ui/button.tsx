@@ -15,20 +15,21 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const base =
-  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium select-none transition-[background-color,border-color,color,transform,opacity] duration-150 ease-[var(--ease)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45";
+  "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium select-none transition-[background-color,border-color,color,transform,opacity,box-shadow,filter] duration-150 ease-[var(--ease)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45";
 
 const variants: Record<Variant, string> = {
   // the primary is inverted (white pill, near-black label), per the dark style
-  primary: "bg-[#f2f2f3] text-[#111114] hover:bg-white",
-  accent: "bg-accent text-white hover:bg-[#5f9bff]",
-  secondary: "border border-control text-text hover:border-[var(--control-hover)] hover:bg-raised",
-  ghost: "text-muted hover:text-text hover:bg-raised",
-  danger: "border border-[#4a2630] text-[var(--pill-negative-ink)] hover:bg-[var(--pill-negative-bg)]",
+  primary: "bg-[#f5f5f7] text-[#0b0b0d] hover:bg-white hover:shadow-[0_0_0_4px_rgb(255_255_255_/_0.08)]",
+  // the one colourful action: the agent spectrum
+  accent: "spectrum-fill text-[#0b0b0d] font-semibold hover:brightness-110 hover:shadow-[0_8px_28px_rgb(139_133_255_/_0.35)]",
+  secondary: "bg-white/[0.07] text-text hover:bg-white/[0.12]",
+  ghost: "text-muted hover:text-text hover:bg-white/[0.07]",
+  danger: "bg-[var(--pill-negative-bg)] text-[var(--pill-negative-ink)] hover:bg-[rgb(255_90_82_/_0.22)]",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-7 px-3 text-[12px]",
-  md: "h-[34px] px-4 text-[13px]",
+  sm: "h-8 px-3.5 text-[12px]",
+  md: "h-9 px-4 text-[13px]",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -55,7 +56,7 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={clsx(
-        "inline-flex size-8 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-raised hover:text-text active:scale-[0.95] disabled:opacity-40",
+        "inline-flex size-8 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-white/[0.08] hover:text-text active:scale-[0.95] disabled:opacity-40",
         active && "text-text",
         className,
       )}

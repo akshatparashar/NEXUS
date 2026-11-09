@@ -2,31 +2,35 @@
 
 Read this first when resuming. The spec is `NEXUS_SPEC.md`; this file says what is done and what is left.
 
-## Status: phases 1–7 done and verified; phase 8 (delivery) in progress
+## Status: all 8 phases done (2026-11-09). Waiting on the user for a model key.
 
 | Area | State | Proof |
 |---|---|---|
-| Backend (FastAPI, SQLAlchemy, Alembic, auth, workspaces) | done | `cd backend && py -m uv run pytest -q` → **31 passed** |
-| LangGraph orchestration (canvas → StateGraph, reviewer loops w/ cap, joins, retries, timeouts, token budget, interrupt() approvals, Postgres checkpointer, crash recovery, retry-from-checkpoint) | done | tests in `backend/tests/test_runs.py` |
-| RAG (pypdf, token chunker, fastembed bge-small 384d local, pgvector HNSW + tsvector, RRF hybrid, /ask streamed with citations) | done | `test_rag.py` + e2e |
-| Events (transactional outbox → bus → worker/projector consumers, idempotency ledger, DLQ + replay, consumer stats) | done for `EVENT_BUS=memory`; **Kafka path written (aiokafka) but not yet run against a real broker** | — |
-| Frontend (Next 16.4, Tailwind 4, React Flow, motion, cmdk): landing, login/register, overview, workflows, builder, runs, run detail, knowledge, playground, monitoring, settings | done | `cd web && npx playwright test` → **10/10 passed**; `npm run build` OK |
-| Design | taste-skill inspector on landing: **0 FAIL**, 2 WARN (no-footage, still-page — defensible) | `.taste-skill/inspect/` |
-| Screenshots | 20 PNGs in `docs/screenshots/` (made with the e2e harness) | `SHOTS=1 npx playwright test e2e/screenshots.spec.ts` |
-| Docker | `docker-compose.yml`, `backend/Dockerfile`, `web/Dockerfile`, `.env.example` written; **not run (no Docker on this PC)** | — |
+| Backend | done | `cd backend && py -m uv run pytest -q` → **31 passed**; ruff clean |
+| Events | done on **both** buses | Playwright 10/10 on `EVENT_BUS=memory` and on a real Kafka 3.9.1 broker; consumer groups at lag 0, DLQ empty |
+| Frontend | done | `npx playwright test` → **12/12** (10 journeys + 2 regressions in `e2e/regressions.spec.ts`); eslint + tsc clean |
+| Docs | done | `README.md`, `docs/architecture.md` + `.mmd/.svg/.png/.excalidraw`, spec deltas at the top of `NEXUS_SPEC.md` |
+| Screenshots | re-shot, 20 PNGs | dev-tools badge hidden, 07 no longer skeletons |
+| Docker | written, **not run** (no Docker on this PC) | — |
 
-## Remaining TODO (in order)
-1. **Real Kafka check**: Kafka 3.9.1 was being downloaded to `D:\coading\NEXUS\.kafka\` (may be incomplete; re-download `https://archive.apache.org/dist/kafka/3.9.1/kafka_2.13-3.9.1.tgz` if `kafka_2.13-3.9.1/` is missing). Java 21 is installed. Run KRaft single node (`bin\windows\kafka-storage.bat random-uuid`, `format -t <id> -c config\kraft\server.properties --standalone`, `kafka-server-start.bat config\kraft\server.properties`), then start the e2e harness with `EVENT_BUS=kafka KAFKA_BOOTSTRAP_SERVERS=localhost:9092` and rerun `npx playwright test`. Fix anything in `app/events/bus.py` (KafkaBus) that breaks.
-2. **README.md** (root): what it is, architecture diagram, quick start (Compose), local dev without Docker (commands below), provider setup (OpenAI/Anthropic/Ollama), tests, screenshots gallery, design notes, honest notes (see "Notes for the report").
-3. **docs/architecture**: diagram (mermaid in README + `docs/architecture.md`; optional SVG via the `diagram` skill).
-4. Update `NEXUS_SPEC.md` where the build deviated: events code lives in `backend/app/events/` (not `kafka/`); font is Public Sans + JetBrains Mono (figures) instead of Geist; app tokens from the data-terminal style (`--ground #171719`, cards `#131217` darker than ground, accent `#4c8dff`, thinking violet `#a88bfa`).
-5. Lint pass: `cd backend && py -m uv run ruff check app tests --select E,F,I,B,UP --ignore E501,B008,UP047,UP046`; `cd web && npx eslint src`.
-6. Re-shoot screenshots once more (playground double-quirk fixed after the last shoot).
-7. Final report to the user, then ask for an OpenAI/Anthropic key (or Ollama) to see real model output.
+Fixed in the delivery session: SSE endpoints pinned a pooled DB connection for the whole stream (now released after the up-front reads); `?task=` run dialog reopened itself after closing; elapsed timers only updated on unrelated re-renders (now `useNow`); live node preview started mid-word; React-compiler lint findings (state resets moved out of effects).
+
+## Remaining TODO
+1. Get an OpenAI/Anthropic key (or Ollama) from the user and look at real model output in a full run.
+2. Optional: run `docker compose up --build` on a machine with Docker.
+3. Optional: commit (user has not asked yet).
+
+### Local Kafka (no Docker)
+`.kafka/kafka_2.13-3.9.1/` is extracted and formatted (data in `.kafka/data`). The `.bat` scripts fail ("input line is too long"), so start it with java directly:
+```bash
+cd /d/coading/NEXUS/.kafka/kafka_2.13-3.9.1 && java -Xmx512m -Dlog4j.configuration=file:config/log4j.properties -Dkafka.logs.dir=D:/coading/NEXUS/.kafka/logs -cp 'D:/coading/NEXUS/.kafka/kafka_2.13-3.9.1/libs/*' kafka.Kafka config/kraft/server.properties
+```
+Then start the API with `EVENT_BUS=kafka KAFKA_BOOTSTRAP_SERVERS=localhost:9092`.
 
 ## How to bring the stack back after a reboot (no Docker)
 ```bash
-# 1) embedded Postgres 16 + pgvector (pgserver). Port may change after reboot:
+# 1) embedded Postgres 16 + pgvector (pgserver). Port may change after reboot. After an unclean shutdown,
+#    WAL recovery can exceed pgserver's 10 s start timeout: wait until .pgdata/postmaster.pid line 8 says 'ready', rerun.
 cd /d/coading/NEXUS/backend && py -m uv run python scripts/dev_db.py      # prints DATABASE_URL; put it in backend/.env
 # 2a) API with the deterministic e2e test model (no key needed; resets DB nexus_e2e each start, E2E_RESET=0 keeps it)
 E2E_PACE=0.05 py -m uv run python scripts/e2e_server.py                     # :8000
@@ -36,7 +40,7 @@ py -m uv run python scripts/serve.py                                        # :8
 cd /d/coading/NEXUS/web && npx next dev -p 3000                              # :3000, proxies /api/v1 → :8000
 # tests
 cd backend && py -m uv run pytest -q                                         # 31 tests, ~15 s
-cd web && npx playwright test                                                # 10 e2e journeys (needs 2a + 3 running)
+cd web && npx playwright test                                                # 12 e2e tests (needs 2a + 3 running)
 # design inspector
 node C:/Users/aksha/.claude/skills/design-taste-frontend/scripts/inspect.mjs http://127.0.0.1:3000/
 ```
@@ -51,3 +55,15 @@ Tooling: `py -m uv` (uv installed via pip), Python 3.12 venv in `backend/.venv`,
 - No Docker and no LLM key on this PC: Compose is unverified here; screenshots/e2e use the extractive test double (clearly labelled).
 - Taste-skill allowances: glass on floating layer (user brief), violet as a single signal (user brief), mono figures inside the app (style's "face" option), node-type tinted tiles in builder (`icon-chips`). Landing WARNs: no footage (hero replay is the moving element), still-page (13 moving elements).
 - Sample content to replace before launch: `docs/samples/*` (fictional documents), landing board rows and hero traces (`web/src/components/landing/traces.ts`, `sections.tsx` BOARD), auth page aside fragment.
+
+## Session 2026-11-09/10 (b): redesign, Vercel readiness, Gemini — DONE
+- **UI "Spectrum"**: monochrome + one hue per agent (research #4fd1ff, analyst #8b85ff, execution #ff5fa2, reviewer #ffb84d), glass floating layer, Geist. Bottom glass dock (`web/src/components/dock/dock.tsx`) replaces the rail; landing rebuilt with GSAP (hero SplitText, pinned DrawSVG relay, horizontal pipeline, Flip tabs). Running state uses the agent's own colour (builder nodes, run tape).
+- **Serverless backend** (`RUN_MODE=serverless`): outbox `flush()` per request, `ServerlessBus` (commands → Vercel Queues via `app/workers/vercel_queue.py`, lifecycle projected inline), uploads in `documents.content` (migration a1c4e2b9f0d3), SSE reads the event log, `kick_if_stale` re-queues orphaned runs, heartbeat stops runs cancelled elsewhere, token coalescing (`TOKEN_FLUSH_MS`), Neon `sslmode` URL handling. `vercel.json` (services web+api), `backend/main.py`, `DEPLOY.md` (Neon + Upstash).
+- **Gemini provider** (`LLM_PROVIDER=google`, `gemini-3.5-flash-lite`, key in git-ignored backend/.env). Real run verified: Research brief, 78 s, ~5k tokens, approved. Fixed `_inline_refs` dropping a field named `title`.
+- Verified: 33 backend tests, 12/12 Playwright on the production build, `next build`. Not verified: an actual Vercel deploy, Docker.
+- Quirk: after long sessions `next dev` can fail with 0xc0000142 (Turbopack can't spawn its CSS worker); `next build && next start` works. Kill leftover node processes first.
+
+## Remaining
+1. User deploys per DEPLOY.md (needs Vercel, Neon, Upstash accounts); read the first build log together.
+2. Research agent sometimes omits [n] citation markers with Gemini (analyst cites fine) — prompt tweak.
+3. Optional: light theme; `docker compose up` on a machine with Docker.

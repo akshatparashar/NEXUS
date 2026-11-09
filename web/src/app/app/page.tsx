@@ -15,6 +15,7 @@ import { Card, Empty, ErrorNote, PageHeader, Skeleton } from "@/components/ui/pr
 import { useActivity } from "@/lib/activity";
 import { get } from "@/lib/api";
 import { fmtCompact, fmtDuration, fmtInt, fmtPct, fmtRelative } from "@/lib/format";
+import { useNow } from "@/lib/hooks";
 import type { Approval, LifecycleEvent, RunSummary, WorkflowSummary } from "@/lib/types";
 import { useRun } from "@/lib/use-run";
 
@@ -144,6 +145,7 @@ function Legend() {
 
 function LatestRun({ runId, loading, onRun }: { runId?: string; loading: boolean; onRun: () => void }) {
   const { run, events } = useRun(runId);
+  const now = useNow(!!run && run.duration_ms == null && !!run.started_at);
   if (loading || (runId && !run)) {
     return (
       <Card title="Latest run">
@@ -174,7 +176,7 @@ function LatestRun({ runId, loading, onRun }: { runId?: string; loading: boolean
           {run.workflow_name} <StatusPill status={run.status} />
         </span>
       }
-      sub={`Started ${fmtRelative(run.started_at ?? run.queued_at)} · ${fmtDuration(run.duration_ms ?? (run.started_at ? Date.now() - new Date(run.started_at).getTime() : null))} · ${fmtInt(run.tokens_in + run.tokens_out)} tokens`}
+      sub={`Started ${fmtRelative(run.started_at ?? run.queued_at)} · ${fmtDuration(run.duration_ms ?? (run.started_at ? now - new Date(run.started_at).getTime() : null))} · ${fmtInt(run.tokens_in + run.tokens_out)} tokens`}
       action={
         <Link href={`/app/runs/${run.id}`} className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
           Open run <ArrowUpRight className="size-3.5" />

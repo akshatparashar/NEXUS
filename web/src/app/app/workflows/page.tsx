@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, MoreHorizontal, Play, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { AgentStack } from "@/components/agent-tile";
 import { RunDialog } from "@/components/run-dialog";
 import { Button, IconButton } from "@/components/ui/button";
@@ -33,10 +33,12 @@ function WorkflowsInner() {
   const [busy, setBusy] = useState(false);
   const presetTask = params.get("task") ?? "";
 
-  // arriving from the landing page with a task: open the run dialog on the first template
-  useEffect(() => {
-    if (presetTask && data?.length && !runFor) setRunFor(data[0].id);
-  }, [presetTask, data, runFor]);
+  // arriving from the landing page with a task: open the run dialog on the first template, once
+  const [presetOpened, setPresetOpened] = useState(false);
+  if (presetTask && data?.length && !presetOpened) {
+    setPresetOpened(true);
+    setRunFor(data[0].id);
+  }
 
   const create = async () => {
     setBusy(true);

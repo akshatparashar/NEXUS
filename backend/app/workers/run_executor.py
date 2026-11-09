@@ -32,6 +32,7 @@ from app.workers.checkpointer import get_checkpointer
 log = get_logger(__name__)
 
 TERMINAL = ("succeeded", "failed", "cancelled", "timed_out")
+HEARTBEAT_SECONDS = 5
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 
 
@@ -50,6 +51,10 @@ class RunExecutor:
         task = asyncio.create_task(self._guarded(run_id, mode, resume), name=f"run-{run_id}")
         self.tasks[run_id] = task
         task.add_done_callback(lambda _: self.tasks.pop(run_id, None))
+
+    async def run_now(self, run_id: uuid.UUID, mode: str, resume: Any = None) -> None:
+        """Execute in the caller's task and return when the run stops (serverless consumers)."""
+        await self._guarded(run_id, mode, resume)
 
     async def cancel(self, run_id: uuid.UUID) -> None:
         task = self.tasks.get(run_id)
@@ -137,11 +142,24 @@ class RunExecutor:
                 update(WorkflowRun).where(WorkflowRun.id == run_id, WorkflowRun.worker_id == WORKER_ID).values(worker_id=None)
             )
 
-    async def _heartbeat(self, run_id: uuid.UUID) -> None:
+    async def _heartbeat(self, run_id: uuid.UUID, owner: asyncio.Task | None) -> None:
+        """Renew the lease, and stop the run if it was cancelled from another process."""
         while True:
-            await asyncio.sleep(10)
+            await asyncio.sleep(HEARTBEAT_SECONDS)
             async with session_scope() as s:
-                await s.execute(update(WorkflowRun).where(WorkflowRun.id == run_id).values(heartbeat_at=datetime.now(UTC)))
+                status = (
+                    await s.execute(
+                        update(WorkflowRun)
+                        .where(WorkflowRun.id == run_id)
+                        .values(heartbeat_at=datetime.now(UTC))
+                        .returning(WorkflowRun.status)
+                    )
+                ).scalar_one_or_none()
+            if status == "cancelled" and owner is not None:
+                log.info("run_cancelled_elsewhere", run_id=str(run_id))
+                self._cancel_requested.add(run_id)
+                owner.cancel()
+                return
 
     async def _execute(self, run_id: uuid.UUID, mode: str, resume: Any) -> None:
         run = await self._claim(run_id)
@@ -196,7 +214,7 @@ class RunExecutor:
                 },
             )
 
-        hb = asyncio.create_task(self._heartbeat(run.id))
+        hb = asyncio.create_task(self._heartbeat(run.id, asyncio.current_task()))
         try:
             async with asyncio.timeout(s.run_timeout_seconds):
                 async for update_ in graph.astream(graph_input, config, stream_mode="updates"):

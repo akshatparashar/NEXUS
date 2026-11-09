@@ -36,10 +36,15 @@ function AgentNodeImpl({ data, selected }: NodeProps<AgentFlowNode>) {
   return (
     <div
       className={clsx(
-        "w-[248px] rounded-[10px] border bg-surface text-left transition-[border-color,box-shadow] duration-200",
-        selected ? "border-accent" : thinking ? "border-thinking" : status === "failed" ? "border-[#5a2a35]" : status === "awaiting_approval" ? "border-[#5a4a24]" : "border-[#2a292e]",
-        "shadow-[0_8px_24px_rgb(0_0_0_/_0.28)]",
+        "w-[248px] rounded-[16px] border bg-surface text-left transition-[border-color,box-shadow] duration-300",
+        selected ? "border-accent" : status === "failed" ? "border-[rgb(255_90_82_/_0.45)]" : status === "awaiting_approval" ? "border-[rgb(255_163_26_/_0.45)]" : "border-white/[0.08]",
+        !thinking && "shadow-[0_8px_24px_rgb(0_0_0_/_0.28)]",
       )}
+      style={
+        thinking && !selected
+          ? { borderColor: meta.hue, boxShadow: `0 0 0 4px color-mix(in oklab, ${meta.hue} 18%, transparent), 0 14px 40px color-mix(in oklab, ${meta.hue} 28%, transparent)` }
+          : undefined
+      }
     >
       <Handle type="target" position={Position.Left} aria-label="Input" />
       <div className="flex items-center gap-2.5 px-3.5 pb-2.5 pt-3">
@@ -51,14 +56,14 @@ function AgentNodeImpl({ data, selected }: NodeProps<AgentFlowNode>) {
         <NodeStatus live={live} />
       </div>
       {thinking ? (
-        <div className="mx-2 mb-2 rounded-[6px] bg-[#0f0e12] px-2.5 py-2">
-          <p className="flex items-center gap-1.5 text-[11px] text-[var(--pill-thinking-ink)]">
-            <span className="thinking-dot" /> {meta.verb}
+        <div className="mx-2 mb-2 rounded-[10px] bg-black/40 px-2.5 py-2">
+          <p className="flex items-center gap-1.5 text-[11px]" style={{ color: meta.hue }}>
+            <span className="thinking-dot" style={{ background: meta.hue }} /> {meta.verb}
             {live && live.iterations > 1 ? ` · revision ${live.iterations - 1}` : ""}
             {live?.step && live.step.attempt > 1 ? ` · attempt ${live.step.attempt}` : ""}
           </p>
           {data.stream ? (
-            <p className="caret mt-1 line-clamp-3 text-[12px] leading-[17px] text-text/85">{data.stream.slice(-160)}</p>
+            <p className="caret mt-1 line-clamp-3 text-[12px] leading-[17px] text-text/85">{streamTail(data.stream)}</p>
           ) : (
             <p className="mt-1 text-[12px] text-muted">{data.agentType === "research" ? "Searching the knowledge base…" : "Thinking…"}</p>
           )}
@@ -115,3 +120,11 @@ function NodeStatus({ live }: { live?: NodeLive | null }) {
 }
 
 export const AgentNode = memo(AgentNodeImpl);
+
+/** The last ~160 characters of a live stream, starting at a word boundary. */
+function streamTail(text: string, n = 160): string {
+  if (text.length <= n) return text;
+  const cut = text.slice(-n);
+  const space = cut.indexOf(" ");
+  return `…${space >= 0 ? cut.slice(space + 1) : cut}`;
+}

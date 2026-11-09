@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Mark } from "@/components/brand";
+import { Aurora } from "@/components/landing/motion";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/primitives";
 import { ApiError, post } from "@/lib/api";
@@ -120,8 +121,9 @@ function AuthAside() {
     { agent: "Reviewer", t: "—", note: "Reviewing…", state: "live" },
   ];
   return (
-    <div className="relative hidden overflow-hidden bg-[#1c1b1f] lg:flex lg:items-center lg:justify-center">
-      <div data-ui className="w-[460px] rounded-[10px] bg-surface p-5 shadow-[var(--card-shadow)]">
+    <div className="relative isolate m-3 hidden overflow-hidden rounded-[32px] bg-[#0b0b0d] lg:flex lg:items-center lg:justify-center">
+      <Aurora className="-z-10" intensity={0.75} />
+      <div data-ui className="glass w-[460px] rounded-[24px] p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-[14px] font-semibold">Pricing brief</p>

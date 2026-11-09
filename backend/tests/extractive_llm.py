@@ -14,7 +14,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agents.llm import LLMClient, Usage
-from app.agents.schemas import AnalysisResult, ExecutionPlan, PlannedAction, ResearchResult, Review, SearchPlan
+from app.agents.schemas import (
+    AnalysisResult,
+    ExecutionPlan,
+    PlannedAction,
+    ResearchResult,
+    Review,
+    SearchPlan,
+)
 
 STOP = set("the a an and or of to in on for with is are was were be by as at from that this it its our your what which who how why does do did".split())
 

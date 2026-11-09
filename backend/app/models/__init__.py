@@ -4,6 +4,7 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    LargeBinary,
     BigInteger,
     Boolean,
     Computed,
@@ -193,6 +194,8 @@ class Document(Base):
     size_bytes: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     storage_path: Mapped[str] = mapped_column(String(500))
+    # the file itself, when UPLOAD_STORAGE=database (serverless hosts have no shared disk)
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, deferred=True)
     status: Mapped[str] = mapped_column(String(16), default="uploaded", index=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)
     pages: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -7,7 +7,10 @@ import path from "node:path";
  */
 const OUT = path.resolve(__dirname, "../../docs/screenshots");
 const SAMPLES = path.resolve(__dirname, "../../docs/samples");
-const shot = (page: Page, name: string, fullPage = false) => page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage });
+const shot = async (page: Page, name: string, fullPage = false) => {
+  await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" }); // the dev-tools badge
+  await page.screenshot({ path: path.join(OUT, `${name}.png`), fullPage });
+};
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(240_000);
@@ -21,13 +24,18 @@ test("landing", async () => {
   await page.goto("/");
   await page.waitForTimeout(1500);
   await shot(page, "01-landing-hero");
-  await page.getByRole("button", { name: "Run" }).first().click();
+  await page.getByRole("button", { name: "Watch a run" }).click(); // scrolls to the hero run and plays it
   await page.waitForTimeout(5200);
   await shot(page, "02-landing-hero-live");
   await expect(page.getByRole("button", { name: "Approve" })).toBeVisible({ timeout: 20_000 });
   await shot(page, "03-landing-hero-approval");
-  await page.getByRole("heading", { name: "Every run, on one board." }).scrollIntoViewIfNeeded();
-  await page.waitForTimeout(900);
+  // sections reveal on scroll, so scroll by id rather than waiting for a hidden heading
+  await page.evaluate(() => document.getElementById("relay")?.scrollIntoView());
+  await page.mouse.wheel(0, 1800);
+  await page.waitForTimeout(1500);
+  await shot(page, "04-landing-relay");
+  await page.evaluate(() => document.getElementById("board")?.scrollIntoView());
+  await page.waitForTimeout(1500);
   await shot(page, "04-landing-board");
 });
 
@@ -55,6 +63,8 @@ test("app", async () => {
 
   // a run followed live on the canvas
   await page.goto("/app/workflows");
+  await expect(page.getByRole("link", { name: "Research brief" })).toBeVisible();
+  await page.waitForTimeout(600);
   await shot(page, "07-workflows");
   await page.getByRole("link", { name: "Research brief" }).click();
   await expect(page.getByText("Compiles to LangGraph · 3 nodes")).toBeVisible();

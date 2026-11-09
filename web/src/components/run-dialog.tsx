@@ -5,7 +5,7 @@ import { clsx } from "clsx";
 import { Play } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AgentStack } from "@/components/agent-tile";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/pill";
@@ -38,22 +38,23 @@ export function RunDialog({
   const qc = useQueryClient();
   const { data: workflows } = useQuery({ queryKey: ["workflows"], queryFn: () => get<WorkflowSummary[]>("/workflows"), enabled: open });
   const { data: cfg } = useQuery({ queryKey: ["config"], queryFn: () => get<ConfigStatus>("/health/config"), enabled: open, staleTime: 60_000 });
-  const [selected, setSelected] = useState<string | undefined>(workflowId);
+  const [chosen, setSelected] = useState<string | undefined>(workflowId);
+  const selected = chosen ?? workflows?.[0]?.id;
   const [task, setTask] = useState(initialTask);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // (re)opening, or opening for another workflow: reset the form (adjusting state during render)
+  const openKey = open ? `${workflowId ?? ""}|${initialTask ?? ""}` : null;
+  const [prevOpenKey, setPrevOpenKey] = useState(openKey);
+  if (openKey !== prevOpenKey) {
+    setPrevOpenKey(openKey);
     if (open) {
       setSelected(workflowId);
       setTask((t) => t || initialTask);
       setError(null);
     }
-  }, [open, workflowId, initialTask]);
-
-  useEffect(() => {
-    if (!selected && workflows?.length) setSelected(workflows[0].id);
-  }, [workflows, selected]);
+  }
 
   const start = async () => {
     if (!selected || task.trim().length < 3) return;

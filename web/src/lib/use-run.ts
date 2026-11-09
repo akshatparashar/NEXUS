@@ -34,9 +34,14 @@ export function useRun(runId: string | null | undefined) {
   const hasData = !!query.data;
   const phase = terminal ? "terminal" : "active";
 
-  useEffect(() => {
+  // a different run: start from empty (adjusting state during render, not in an effect)
+  const [prevRunId, setPrevRunId] = useState(runId);
+  if (runId !== prevRunId) {
+    setPrevRunId(runId);
     setEvents([]);
     setTokens({});
+  }
+  useEffect(() => {
     lastSeq.current = 0;
   }, [runId]);
 

@@ -15,7 +15,8 @@ import { useActivity } from "@/lib/activity";
 import { AGENTS } from "@/lib/agents";
 import { get, post } from "@/lib/api";
 import { fmtClock, fmtDuration, fmtInt, fmtPct, fmtRelative } from "@/lib/format";
-import type { AgentType, ConfigStatus } from "@/lib/types";
+import { useNow } from "@/lib/hooks";
+import type { AgentType, ConfigStatus, JsonObject } from "@/lib/types";
 
 interface TopicRow {
   topic: string;
@@ -68,7 +69,7 @@ interface EventRow {
   run_id: string | null;
   seq: number | null;
   topic: string;
-  payload: Record<string, any>;
+  payload: JsonObject;
   occurred_at: string;
   processed_at: string;
   latency_ms: number;
@@ -226,7 +227,8 @@ export default function MonitoringPage() {
 }
 
 function Stage({ title, lines, mono, live }: { title: string; lines: [string, string, boolean][]; mono?: boolean; live?: string }) {
-  const fresh = live && Date.now() - new Date(live).getTime() < 10_000;
+  const now = useNow(!!live, 2000);
+  const fresh = live && now - new Date(live).getTime() < 10_000;
   return (
     <div className="flex flex-col rounded-[8px] bg-raised/60 p-3.5">
       <p className={clsx("flex items-center gap-2 text-[13px] font-medium", mono && "num")}>

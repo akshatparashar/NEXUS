@@ -18,6 +18,7 @@ import { toast } from "@/components/ui/toast";
 import { post } from "@/lib/api";
 import { fmtClock, fmtDateTime, fmtDuration, fmtInt, plain, shortId } from "@/lib/format";
 import type { LifecycleEvent, Run, RunSummary, Source, Step, ToolCall } from "@/lib/types";
+import { useNow } from "@/lib/hooks";
 import { useRun } from "@/lib/use-run";
 
 export default function RunPage() {
@@ -51,11 +52,15 @@ function RunView({ run, events, tokens }: { run: Run; events: LifecycleEvent[]; 
   const [busy, setBusy] = useState<string | null>(null);
   const pendingApproval = run.approvals.find((a) => a.status === "pending");
   const active = ["queued", "running", "awaiting_approval"].includes(run.status);
+  const now = useNow(active);
   const sources: Source[] = run.output?.sources ?? collectSources(run.steps);
 
-  useEffect(() => {
+  // a new approval request opens the sheet once
+  const [seenApproval, setSeenApproval] = useState<string | undefined>(undefined);
+  if (pendingApproval?.id !== seenApproval) {
+    setSeenApproval(pendingApproval?.id);
     if (pendingApproval) setApprovalOpen(true);
-  }, [pendingApproval?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const act = async (kind: "cancel" | "retry" | "rerun") => {
     setBusy(kind);
@@ -75,7 +80,7 @@ function RunView({ run, events, tokens }: { run: Run; events: LifecycleEvent[]; 
     }
   };
 
-  const elapsed = run.duration_ms ?? (run.started_at ? Date.now() - +new Date(run.started_at) : null);
+  const elapsed = run.duration_ms ?? (run.started_at ? now - +new Date(run.started_at) : null);
 
   return (
     <div className="mx-auto w-full max-w-[1400px] px-4 py-6 md:px-8 md:py-8">

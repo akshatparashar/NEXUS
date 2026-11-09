@@ -41,12 +41,14 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const connected = useActivity((s) => s.connected);
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 flex-none items-center gap-3 border-b border-border bg-ground/95 px-4 backdrop-blur-[2px] md:px-6">
-      <Link href="/app" className="md:hidden" aria-label="NEXUS home">
-        <Mark />
+    <header className="glass-bar sticky top-0 z-30 flex h-14 flex-none items-center gap-3 px-4 md:px-6">
+      <Link href="/app" aria-label="NEXUS home" className="flex items-center gap-2 pr-1">
+        <Mark size={24} live={connected} />
+        <span className="hidden text-[15px] font-semibold tracking-[-0.02em] lg:inline">NEXUS</span>
       </Link>
+      <span className="hidden h-5 w-px bg-white/10 sm:block" aria-hidden />
       <WorkspaceSwitcher />
-      <span className="text-muted">/</span>
+      <span className="hidden text-muted sm:inline">/</span>
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[13px]">
         {parts.length > 1 ? (
           <>
@@ -63,7 +65,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <div className="ml-auto flex items-center gap-2">
         <button
           onClick={onOpenPalette}
-          className="hidden h-8 w-[300px] items-center gap-2 rounded-full border border-control px-3 text-[13px] text-muted transition-colors hover:border-[var(--control-hover)] hover:text-text lg:flex"
+          className="hidden h-9 w-[280px] items-center gap-2 rounded-full bg-white/[0.06] px-3.5 text-[13px] text-muted transition-colors hover:bg-white/[0.1] hover:text-text lg:flex"
         >
           <Search className="size-3.5" aria-hidden />
           <span className="flex-1 text-left">Search or jump to…</span>

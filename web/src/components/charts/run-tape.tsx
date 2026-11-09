@@ -51,7 +51,12 @@ export function RunTape({
   const lanes = useMemo(() => {
     const order = graph.nodes.map((n) => n.id);
     const seen = new Set(order);
-    for (const s of steps) if (!seen.has(s.node_id)) (order.push(s.node_id), seen.add(s.node_id));
+    for (const s of steps) {
+      if (!seen.has(s.node_id)) {
+        order.push(s.node_id);
+        seen.add(s.node_id);
+      }
+    }
     return order.map((id) => {
       const node = graph.nodes.find((n) => n.id === id);
       return { id, label: node?.data.label ?? steps.find((s) => s.node_id === id)?.label ?? id, type: node?.type ?? steps.find((s) => s.node_id === id)?.agent_type ?? "research" };
@@ -111,7 +116,7 @@ export function RunTape({
                 const bw = Math.max(3, x(b) - bx);
                 const sel = selectedStep === s.id;
                 let fill = s.iteration > 1 ? "#9fa3ab" : "var(--chart-1)";
-                if (s.status === "running") fill = "var(--thinking)";
+                if (s.status === "running") fill = meta?.hue ?? "var(--thinking)"; // the agent working now, in its own colour
                 if (s.status === "failed") fill = "url(#tape-hatch)";
                 if (s.status === "cancelled") fill = "#3a3a3e";
                 return (
@@ -173,7 +178,7 @@ export function TapeLegend() {
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
       {item(<span className="h-2 w-4 rounded-[2px] bg-[var(--chart-1)]" />, "Step")}
       {item(<span className="h-2 w-4 rounded-[2px] bg-[#9fa3ab]" />, "Revision")}
-      {item(<span className="h-2 w-4 rounded-[2px] bg-thinking" />, "Generating")}
+      {item(<span className="spectrum-flow h-2 w-4 rounded-[2px]" />, "Generating")}
       {item(
         <svg width="16" height="8" aria-hidden>
           <rect width="16" height="8" rx="2" fill="url(#legend-hatch)" stroke="var(--negative)" />

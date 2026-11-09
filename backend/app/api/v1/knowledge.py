@@ -114,6 +114,7 @@ async def ask(body: AskIn, session: SessionDep, ws: CurrentWorkspace) -> EventSo
     """Grounded answer, streamed. Emits ``sources`` first, then ``token`` deltas, then ``done``."""
     llm = get_llm()
     hits = await hybrid_search(session, ws.id, body.question, k=body.k)
+    await session.close()  # return the connection to the pool instead of holding it for the whole stream
 
     async def gen():
         yield {"event": "sources", "data": json.dumps([{**h.as_dict(), "n": i} for i, h in enumerate(hits, 1)])}
@@ -139,10 +140,11 @@ async def ask(body: AskIn, session: SessionDep, ws: CurrentWorkspace) -> EventSo
 
 
 @router.post("/agents/{agent_type}/chat", dependencies=[rate_limit("ask", "rate_limit_ask")])
-async def agent_chat(agent_type: str, body: ChatIn, ws: CurrentWorkspace) -> EventSourceResponse:
+async def agent_chat(agent_type: str, body: ChatIn, session: SessionDep, ws: CurrentWorkspace) -> EventSourceResponse:
     """Agent Playground: talk to one agent directly. Research and Analyst search the knowledge base first."""
     if agent_type not in prompts.PLAYGROUND:
         raise NotFound("Unknown agent.")
+    await session.close()  # the auth lookup is done; don't hold a connection for the whole stream
     llm = get_llm()
     model = get_settings().llm_model
 

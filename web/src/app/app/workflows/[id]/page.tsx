@@ -37,6 +37,7 @@ import { AGENT_ORDER, AGENTS } from "@/lib/agents";
 import { post, put, get } from "@/lib/api";
 import { fmtDuration } from "@/lib/format";
 import type { AgentType, Graph, NodeData, RunSummary, Workflow } from "@/lib/types";
+import { useNow } from "@/lib/hooks";
 import { useRun } from "@/lib/use-run";
 
 const nodeTypes = { research: AgentNode, analyst: AgentNode, execution: AgentNode, reviewer: AgentNode };
@@ -60,7 +61,7 @@ export default function BuilderPage() {
   }
   if (isLoading || !data) {
     return (
-      <div className="flex h-[calc(100dvh-48px)] gap-3 p-2">
+      <div className="flex h-[calc(100dvh-56px-var(--dock-space))] gap-3 p-2">
         <Skeleton className="h-full w-[232px]" />
         <Skeleton className="h-full flex-1" />
       </div>
@@ -112,7 +113,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
   const [name, setName] = useState(workflow.name);
   const [selected, setSelected] = useState<string | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
-  const [checking, setChecking] = useState(false);
+  const [validatedKey, setValidatedKey] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const [version, setVersion] = useState(workflow.version);
   const [runOpen, setRunOpen] = useState(false);
@@ -126,6 +127,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
 
   // ── live run on the canvas ──
   const { run, nodes: liveNodes, tokens, events } = useRun(activeRun);
+  const now = useNow(!!run && !run.duration_ms);
   useEffect(() => {
     setNodes((ns) =>
       ns.map((n) => {
@@ -163,20 +165,21 @@ function Builder({ workflow }: { workflow: Workflow }) {
   }, [structural, save]);
 
   // ── validation (server compiles the graph) ──
+  const graphKey = JSON.stringify(graph);
+  const checking = graphKey !== validatedKey;
   useEffect(() => {
-    setChecking(true);
     const t = setTimeout(async () => {
       try {
         setValidation(await post<Validation>("/workflows/validate", { name: name || "x", graph }));
       } catch {
         /* keep last */
       } finally {
-        setChecking(false);
+        setValidatedKey(graphKey);
       }
     }, 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(graph)]);
+  }, [graphKey]);
 
   // revision loops are implied by the reviewer, so they are drawn (dashed) but not editable
   const loopEdges: Edge[] = useMemo(() => {
@@ -278,7 +281,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-48px)] flex-col">
+    <div className="flex h-[calc(100dvh-56px-var(--dock-space))] flex-col">
       {/* builder bar */}
       <div className="flex h-11 flex-none items-center gap-3 px-3 md:px-4">
         <Link href="/app/workflows" aria-label="Back to workflows" className="rounded-full p-1.5 text-muted hover:bg-raised hover:text-text">
@@ -412,7 +415,7 @@ function Builder({ workflow }: { workflow: Workflow }) {
                   <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
                     <span className="text-text">{run.input.task}</span>
                   </p>
-                  <span className="num text-[12px] text-muted">{fmtDuration(run.duration_ms ?? (run.started_at ? Date.now() - +new Date(run.started_at) : null))}</span>
+                  <span className="num text-[12px] text-muted">{fmtDuration(run.duration_ms ?? (run.started_at ? now - +new Date(run.started_at) : null))}</span>
                   <Link href={`/app/runs/${run.id}`} className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-text">
                     Open run <ArrowUpRight className="size-3.5" />
                   </Link>

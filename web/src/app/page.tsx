@@ -1,65 +1,62 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
-import Link from "next/link";
-import { Mark } from "@/components/brand";
-import { HeroRun } from "@/components/landing/hero-run";
-import { Closing, FooterLine, HowItWorks, LiveControls, RunBoard, Stack, useReveal } from "@/components/landing/sections";
+import { ArrowRight, Boxes, Home, Layers, LayoutList, SlidersHorizontal, Workflow } from "lucide-react";
+import { useState } from "react";
+import { Dock, type DockItem } from "@/components/dock/dock";
+import { Hero } from "@/components/landing/hero";
+import { useLandingMotion } from "@/components/landing/motion";
+import { Pipeline } from "@/components/landing/pipeline";
+import { Relay } from "@/components/landing/relay";
+import { Closing, LiveControls, RunBoard, Stack } from "@/components/landing/sections";
+import { gsap, ScrollTrigger, useGSAP } from "@/lib/gsap";
+
+const SECTIONS = [
+  { id: "top", label: "Home", icon: Home },
+  { id: "relay", label: "Agents", icon: Boxes },
+  { id: "controls", label: "Controls", icon: SlidersHorizontal },
+  { id: "board", label: "Runs", icon: LayoutList },
+  { id: "pipeline", label: "Pipeline", icon: Workflow },
+  { id: "stack", label: "Stack", icon: Layers },
+];
 
 export default function Landing() {
-  const root = useReveal();
+  const root = useLandingMotion();
+  const [active, setActive] = useState("top");
+
+  // the dock follows the section in the middle of the screen
+  useGSAP(
+    () => {
+      SECTIONS.forEach((s) => {
+        ScrollTrigger.create({
+          trigger: `#${s.id}`,
+          start: "top 55%",
+          end: "bottom 55%",
+          onToggle: (self) => self.isActive && setActive(s.id),
+        });
+      });
+    },
+    { scope: root },
+  );
+
+  const go = (id: string) => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    gsap.to(window, { scrollTo: { y: `#${id}`, autoKill: true }, duration: reduce ? 0 : 1.1, ease: "power3.inOut" });
+  };
+
+  const items: DockItem[] = SECTIONS.map((s) => ({ id: s.id, label: s.label, icon: s.icon, onSelect: () => go(s.id) }));
+
   return (
     <div ref={root} className="landing min-h-dvh overflow-x-clip bg-ground text-text">
-      {/* Hero: two tones meeting at 50%. Left: what this is. Right: the product, working. */}
-      <header className="relative grid min-h-[100svh] grid-cols-1 md:grid-cols-2">
-        <div className="relative order-2 flex flex-col justify-end px-5 pb-10 pt-12 md:order-1 md:px-10 md:pb-10 md:pt-10">
-          <Link href="/" aria-label="NEXUS home" className="absolute left-5 top-6 hidden items-center gap-2.5 md:left-10 md:top-10 md:flex">
-            <Mark size={24} />
-            <span className="text-[16px] font-semibold tracking-[-0.01em]">NEXUS</span>
-          </Link>
-          <h1 className="text-[clamp(40px,4.6vw,72px)] font-medium leading-[0.98] tracking-[-0.035em]">
-            <span className="mask-line">
-              <span style={{ animationDelay: "120ms" }}>Intelligence that</span>
-            </span>
-            <span className="mask-line">
-              <span style={{ animationDelay: "230ms" }}>gets work done.</span>
-            </span>
-          </h1>
-          <p className="fade-up mt-8 max-w-[44ch] text-[17px] leading-[27px] text-[#d4d5d9]" style={{ animationDelay: "700ms" }}>
-            NEXUS runs a team of AI agents over your documents. Draw the team, give it a task, and watch it research, analyse, act and review, step by step.
-          </p>
-          <div className="fade-up mt-8 flex flex-wrap items-center gap-5" style={{ animationDelay: "760ms" }}>
-            <Link
-              href="/register"
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-[#f2f2f3] px-5 text-[15px] font-medium text-[#111114] transition-[background-color,transform] hover:bg-white active:scale-[0.98]"
-            >
-              Open the app <ArrowRight className="size-4" />
-            </Link>
-            <span className="text-[15px] text-muted">Free to self-host. Runs with OpenAI, Anthropic or a local model.</span>
-          </div>
-        </div>
-        <div className="relative order-1 flex min-h-[58svh] items-center justify-center bg-[#1c1b1f] px-4 pb-10 pt-20 md:order-2 md:min-h-0 md:px-10 md:py-24">
-          <Link href="/" aria-label="NEXUS home" className="absolute left-5 top-6 flex items-center gap-2.5 md:hidden">
-            <Mark size={22} />
-            <span className="text-[15px] font-semibold">NEXUS</span>
-          </Link>
-          <Link href="/login" className="absolute right-5 top-6 text-[15px] text-text hover:text-accent-ink md:right-10 md:top-10">
-            Sign in
-          </Link>
-          <div className="fade-up w-full max-w-[560px]" style={{ animationDelay: "400ms" }}>
-            <HeroRun />
-          </div>
-        </div>
-      </header>
-
+      <Hero />
       <main>
-        <RunBoard />
+        <Relay />
         <LiveControls />
-        <HowItWorks />
+        <RunBoard />
+        <Pipeline />
         <Stack />
         <Closing />
       </main>
-      <FooterLine />
+      <Dock label="Page sections" items={items} activeId={active} action={{ label: "Open the app", href: "/register", icon: ArrowRight }} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.core.deps import CurrentWorkspace, SessionDep
 from app.core.errors import Conflict, NotFound
 from app.events.envelope import EventEnvelope
-from app.events.outbox import enqueue, nudge
+from app.events.outbox import enqueue, flush
 from app.models import DeadLetter, utcnow
 from app.services import metrics_service
 
@@ -54,5 +54,5 @@ async def replay_dead_letter(dl_id: uuid.UUID, session: SessionDep, ws: CurrentW
     enqueue(session, dl.topic, env)
     dl.replayed_at = utcnow()
     await session.commit()
-    nudge()
+    await flush()
     return {"replayed": True, "event_id": str(env.event_id)}

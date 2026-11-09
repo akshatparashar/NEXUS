@@ -7,6 +7,7 @@ from fastapi import APIRouter, Header, Query, Request
 from sqlalchemy import func, select
 from sse_starlette.sse import EventSourceResponse
 
+from app.core.config import get_settings
 from app.core.deps import CurrentUser, CurrentWorkspace, SessionDep
 from app.database.session import session_scope
 from app.events import envelope as ev
@@ -133,8 +134,14 @@ async def stream_run(
     Token deltas arrive as ``token`` events without ids (they are not persisted).
     """
     run = await run_service.get_run(session, ws, run_id)
+    await session.close()  # return the connection to the pool instead of holding it for the whole stream
     start_after = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
     already_done = run.status in ("succeeded", "failed", "cancelled", "timed_out")
+    # serverless: the run may be executing in another instance, so lifecycle events are also read
+    # from the event log; and a run whose worker vanished is queued again here
+    poll_log = get_settings().serverless
+    if poll_log and not already_done:
+        await run_service.kick_if_stale(run_id)
 
     async def gen():
         last = start_after
@@ -156,8 +163,24 @@ async def stream_run(
                 yield {"event": "end", "data": "{}"}
                 return
             while not await request.is_disconnected():
-                msg = await sub.get(timeout=15)
+                msg = await sub.get(timeout=1.5 if poll_log else 15)
                 if msg is None:
+                    if not poll_log:
+                        continue
+                    async with session_scope() as s:
+                        rows = (
+                            await s.execute(
+                                select(ExecutionEvent)
+                                .where(ExecutionEvent.run_id == run_id, ExecutionEvent.seq > last)
+                                .order_by(ExecutionEvent.seq)
+                            )
+                        ).scalars().all()
+                    for e in rows:
+                        last = max(last, e.seq or 0)
+                        yield {"event": "lifecycle", "id": str(e.seq), "data": json.dumps(_event_dict(e))}
+                        if e.type in TERMINAL_EVENTS:
+                            yield {"event": "end", "data": "{}"}
+                            return
                     continue
                 if msg.get("type") == ev.AGENT_TOKEN:
                     yield {"event": "token", "data": json.dumps(msg)}
@@ -176,9 +199,10 @@ async def stream_run(
 
 
 @router.get("/stream/activity")
-async def stream_activity(request: Request, ws: CurrentWorkspace) -> EventSourceResponse:
+async def stream_activity(request: Request, session: SessionDep, ws: CurrentWorkspace) -> EventSourceResponse:
     """Workspace-wide live feed (dashboard, monitoring, knowledge base status)."""
     ws_id = ws.id
+    await session.close()  # the auth lookup is done; don't hold a connection for an open-ended stream
 
     async def gen():
         async with get_pubsub().subscription(workspace_channel(ws_id)) as sub:

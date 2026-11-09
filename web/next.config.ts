@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
 // The browser only ever talks to this origin. /api/v1/* is proxied to FastAPI, so the refresh
-// cookie is first-party and the API URL never ships to the client.
+// cookie is first-party and the API URL never ships to the client. On Vercel the platform routes
+// /api/* to the FastAPI service itself (vercel.json), so these rewrites are only for Docker and dev.
 const API_URL = process.env.API_URL ?? "http://127.0.0.1:8000";
+const ON_VERCEL = !!process.env.VERCEL;
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: ON_VERCEL ? undefined : "standalone",
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   compress: false, // never buffer Server-Sent Events behind gzip
   turbopack: {
@@ -17,6 +19,7 @@ const nextConfig: NextConfig = {
     },
   },
   async rewrites() {
+    if (ON_VERCEL) return [];
     return [
       { source: "/api/v1/:path*", destination: `${API_URL}/api/v1/:path*` },
       { source: "/docs", destination: `${API_URL}/docs` },

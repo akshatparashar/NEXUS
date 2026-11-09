@@ -3,6 +3,8 @@
 * ``KafkaBus``  – Apache Kafka through aiokafka. Used in Docker Compose and production.
 * ``MemoryBus`` – an in-process bus with the same consumer-group semantics (each group gets every
   message once, ordered per key). Used by the tests and by the no-Docker local mode.
+* ``ServerlessBus`` – for Vercel: commands go to Vercel Queues, whose consumer function runs
+  them; lifecycle events are projected in the process that produced them.
 
 Both deliver ``(topic, key, value)`` to a handler and only advance after the handler returns, so
 the at-least-once contract is the same either way.
@@ -16,7 +18,7 @@ from dataclasses import dataclass, field
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.events.envelope import ALL_TOPICS
+from app.events.envelope import ALL_TOPICS, COMMANDS, LIFECYCLE
 
 log = get_logger(__name__)
 
@@ -201,13 +203,76 @@ class KafkaBus(MessageBus):
         return self._producer is not None
 
 
+# --- Serverless (Vercel) ---------------------------------------------------------------------
+
+
+class ServerlessBus(MessageBus):
+    """No long-lived consumers exist on serverless hosts, so each topic is delivered directly.
+
+    * ``nexus.commands`` → a Vercel Queues topic. Its consumer (``app.workers.vercel_queue``)
+      runs the command to completion in its own function invocation, with the queue's retries.
+      ``COMMAND_QUEUE=inline`` runs the command in this process instead (local testing).
+    * ``nexus.lifecycle`` → the projector, right here. It is idempotent, so a re-publish of the
+      same outbox row is harmless.
+    * ``nexus.dlq`` → only logged; dead letters are already stored in the database.
+    """
+
+    name = "serverless"
+
+    def __init__(self) -> None:
+        self.stats: dict[str, TopicStats] = defaultdict(TopicStats)
+        self._projector = None
+        self._inline_tasks: set[asyncio.Task] = set()
+
+    async def publish(self, topic: str, key: str, value: bytes) -> None:
+        self.stats[topic].produced += 1
+        if topic == COMMANDS:
+            await self._send_command(key, value)
+        elif topic == LIFECYCLE:
+            if self._projector is None:
+                from app.workers.projector import Projector  # imported late: the projector imports the bus
+
+                self._projector = Projector()
+            await self._projector(topic, value)
+        else:
+            log.warning("serverless_bus_unrouted", topic=topic, key=key)
+
+    async def _send_command(self, key: str, value: bytes) -> None:
+        import json
+
+        s = get_settings()
+        if s.command_queue == "inline":
+            from app.workers.vercel_queue import handle_command
+
+            task = asyncio.create_task(handle_command(value))
+            self._inline_tasks.add(task)
+            task.add_done_callback(self._inline_tasks.discard)
+            return
+        from vercel.queue import send
+
+        payload = json.loads(value)
+        await send(s.queue_topic, payload, idempotency_key=payload.get("event_id"))
+
+    async def subscribe(self, topics: list[str], group: str, handler: Handler) -> None:
+        raise RuntimeError("ServerlessBus has no long-lived consumers; commands arrive through Vercel Queues")
+
+    async def join(self) -> None:
+        """Test helper: wait for commands running inline."""
+        while self._inline_tasks:
+            await asyncio.gather(*list(self._inline_tasks), return_exceptions=True)
+
+
 _bus: MessageBus | None = None
 
 
 def get_bus() -> MessageBus:
     global _bus
     if _bus is None:
-        _bus = KafkaBus() if get_settings().event_bus == "kafka" else MemoryBus()
+        s = get_settings()
+        if s.serverless:
+            _bus = ServerlessBus()
+        else:
+            _bus = KafkaBus() if s.event_bus == "kafka" else MemoryBus()
     return _bus
 
 

@@ -19,9 +19,11 @@ class CommandConsumer(Consumer):
     name = "nexus-worker"
     topics = [ev.COMMANDS]
 
-    def __init__(self, executor: RunExecutor) -> None:
+    def __init__(self, executor: RunExecutor, *, inline: bool = False) -> None:
         super().__init__()
         self.executor = executor
+        # inline (serverless): finish the work before returning, so the function stays alive for it
+        self.inline = inline
         self.ingest_tasks: set[asyncio.Task] = set()
 
     async def handle(self, envelope: EventEnvelope, topic: str, session: AsyncSession) -> None:
@@ -33,17 +35,26 @@ class CommandConsumer(Consumer):
         t = envelope.type
         if t == ev.RUN_REQUESTED:
             assert envelope.run_id
-            self.executor.submit(envelope.run_id, envelope.payload.get("mode", "start"))
+            await self._run(envelope.run_id, envelope.payload.get("mode", "start"))
         elif t == ev.RUN_RESUME:
             assert envelope.run_id
-            self.executor.submit(envelope.run_id, "resume", envelope.payload.get("decision", {}))
+            await self._run(envelope.run_id, "resume", envelope.payload.get("decision", {}))
         elif t == ev.RUN_CANCEL:
             assert envelope.run_id
             await self.executor.cancel(envelope.run_id)
         elif t == ev.DOCUMENT_UPLOADED:
+            if self.inline:
+                await ingest_document(uuid.UUID(envelope.payload["document_id"]))
+                return
             task = asyncio.create_task(ingest_document(uuid.UUID(envelope.payload["document_id"])))
             self.ingest_tasks.add(task)
             task.add_done_callback(self.ingest_tasks.discard)
+
+    async def _run(self, run_id: uuid.UUID, mode: str, resume: object = None) -> None:
+        if self.inline:
+            await self.executor.run_now(run_id, mode, resume)
+        else:
+            self.executor.submit(run_id, mode, resume)
 
     async def wait_idle(self) -> None:
         while self.ingest_tasks:

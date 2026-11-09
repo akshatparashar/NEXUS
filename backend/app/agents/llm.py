@@ -1,7 +1,8 @@
 """Provider-agnostic LLM access.
 
 Agents talk to :class:`LLMClient`, never to a provider SDK. The production implementation uses
-LangChain's ``init_chat_model`` so OpenAI, Anthropic and Ollama are interchangeable through config.
+LangChain's ``init_chat_model`` so OpenAI, Anthropic, Google Gemini and Ollama are interchangeable
+through config.
 
 Structured outputs are produced by forcing a single tool call whose JSON schema is the Pydantic
 model. While the arguments stream in we parse the partial JSON and forward growth of one text field
@@ -77,12 +78,15 @@ def _inline_refs(schema: dict) -> dict:
     schema = copy.deepcopy(schema)
     defs = schema.pop("$defs", {})
 
-    def resolve(node: Any) -> Any:
+    def resolve(node: Any, in_properties: bool = False) -> Any:
         if isinstance(node, dict):
             if "$ref" in node:
                 name = node["$ref"].rsplit("/", 1)[-1]
                 return resolve(copy.deepcopy(defs[name]))
-            return {k: resolve(v) for k, v in node.items() if k != "title"}
+            if in_properties:  # keys here are field names; a field may well be called "title"
+                return {k: resolve(v) for k, v in node.items()}
+            # drop Pydantic's "title" annotations (strings), keep everything else
+            return {k: resolve(v, in_properties=(k == "properties")) for k, v in node.items() if not (k == "title" and isinstance(v, str))}
         if isinstance(node, list):
             return [resolve(x) for x in node]
         return node
@@ -104,10 +108,13 @@ def tool_spec(schema: type[BaseModel]) -> dict:
 def _classify(e: Exception) -> Exception:
     name = type(e).__name__.lower()
     msg = str(e).lower()
-    transient_markers = ("ratelimit", "timeout", "connection", "apierror", "overloaded", "internalserver", "503", "502", "529")
+    transient_markers = (
+        "ratelimit", "timeout", "connection", "apierror", "overloaded", "internalserver",
+        "resourceexhausted", "resource_exhausted", "429", "503", "502", "529",
+    )
     if any(m in name or m in msg for m in transient_markers) and "authentication" not in name:
         return TransientLLMError(f"{type(e).__name__}: {e}")
-    if "authentication" in name or "401" in msg or "invalid api key" in msg or "incorrect api key" in msg:
+    if "authentication" in name or "401" in msg or "invalid api key" in msg or "incorrect api key" in msg or "api_key_invalid" in msg:
         return LLMNotConfigured(f"The {get_settings().llm_provider} API key was rejected. Check your .env.")
     return e
 
@@ -138,11 +145,16 @@ class LangChainLLM(LLMClient):
                 if s.openai_base_url:
                     kwargs["base_url"] = s.openai_base_url
             elif s.llm_provider == "anthropic":
-                kwargs.update(api_key=s.anthropic_api_key, max_tokens=4096)
+                kwargs.update(api_key=s.anthropic_api_key, max_tokens=s.llm_max_output_tokens)
+            elif s.llm_provider == "google":
+                # current Gemini models use fixed sampling and warn when given a temperature
+                kwargs.pop("temperature")
+                kwargs.update(google_api_key=s.google_api_key, max_output_tokens=s.llm_max_output_tokens)
             else:
                 kwargs.pop("timeout")
                 kwargs.update(base_url=s.ollama_base_url)
-            self._cache[key] = init_chat_model(name, model_provider=s.llm_provider, **kwargs)
+            provider = "google_genai" if s.llm_provider == "google" else s.llm_provider
+            self._cache[key] = init_chat_model(name, model_provider=provider, **kwargs)
         return self._cache[key]
 
     async def structured(

@@ -1,72 +1,79 @@
 @import "tailwindcss";
 
 /* ──────────────────────────────────────────────────────────────────────────────────────────────
-   NEXUS design tokens — "Instrument"
-   App style: data-terminal (dark). Graphite ground, cards one step darker, colour on data only.
-   Every selection is a 1px accent line. Violet means exactly one thing: an LLM is generating now.
-   Glass appears only on the floating layer (menus, palette, sheets, toasts, canvas overlays).
+   NEXUS design tokens — "Spectrum"
+   The interface is monochrome: black, white and greys. Colour has one job: each of the four agents
+   owns a hue, and the gradient you see anywhere is those four agents handing work to each other.
+   Glass belongs to the floating layer: the dock, the top bar, menus, sheets and the hero run card.
    ────────────────────────────────────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: dark;
 
-  --ground: #171719;
-  --surface: #131217; /* cards sit darker than the ground */
-  --raised: #212023; /* nested panels, hover */
-  --well: #101013; /* builder canvas */
-  --active: #26252a;
-  --border: #222224;
-  --rule: #1b1a1f;
-  --control: #3a3a3e;
-  --control-hover: #4a4a50;
+  /* monochrome */
+  --ground: #09090b;
+  --surface: #131316; /* cards sit one step above the ground */
+  --raised: #1b1b1f; /* nested panels, hover */
+  --well: #0c0c0e; /* builder canvas */
+  --active: #232328;
+  --border: #1f1f24;
+  --rule: #19191d;
+  --control: #34343b;
+  --control-hover: #4a4a53;
+  --paper: #f5f5f7; /* the light sections of the landing page */
+  --paper-ink: #0b0b0d;
+  --paper-muted: #5c5c66;
 
-  --text: #f2f2f3;
-  --muted: #8a8c92; /* 5.3:1 on --surface */
+  --text: #f5f5f7;
+  --muted: #92929b; /* 6.0:1 on --surface */
 
-  --accent: #4c8dff; /* electric blue: selection + the one primary data hue */
-  --accent-ink: #7fadff;
-  --thinking: #a88bfa; /* signal only: a model is generating right now */
-  --positive: #44a282;
-  --negative: #e5566f;
-  --warning: #d9a441;
+  /* the spectrum: one hue per agent */
+  --agent-research: #4fd1ff;
+  --agent-analyst: #8b85ff;
+  --agent-execution: #ff5fa2;
+  --agent-reviewer: #ffb84d;
+  --spectrum: linear-gradient(100deg, var(--agent-research) 0%, var(--agent-analyst) 34%, var(--agent-execution) 67%, var(--agent-reviewer) 100%);
+  --spectrum-soft: linear-gradient(100deg, rgb(79 209 255 / 0.18), rgb(139 133 255 / 0.18) 34%, rgb(255 95 162 / 0.18) 67%, rgb(255 184 77 / 0.18));
 
-  --pill-positive-bg: #1b2828;
-  --pill-positive-ink: #5fc39c;
-  --pill-negative-bg: #2c1a20;
-  --pill-negative-ink: #ef7a8e;
-  --pill-warning-bg: #2a2416;
-  --pill-warning-ink: #e0b25c;
-  --pill-neutral-bg: #212023;
-  --pill-neutral-ink: #bdbdc0;
-  --pill-thinking-bg: #221d33;
-  --pill-thinking-ink: #c1abff;
-  --pill-accent-bg: #172238;
-  --pill-accent-ink: #8db6ff;
+  --accent: #6b8cff; /* focus, selection, links */
+  --accent-ink: #9db2ff;
+  --thinking: #b98cff; /* signal: a model is generating right now */
+  --positive: #30d158;
+  --negative: #ff5a52;
+  --warning: #ffa31a;
 
-  /* agent identity tints (builder node-type tiles; never used for status) */
-  --agent-research: #7eb6c8;
-  --agent-analyst: #c8b27e;
-  --agent-execution: #cc9a82;
-  --agent-reviewer: #a9b1bd;
+  --pill-positive-bg: rgb(48 209 88 / 0.14);
+  --pill-positive-ink: #5fe08a;
+  --pill-negative-bg: rgb(255 90 82 / 0.14);
+  --pill-negative-ink: #ff8a84;
+  --pill-warning-bg: rgb(255 163 26 / 0.14);
+  --pill-warning-ink: #ffbf5c;
+  --pill-neutral-bg: rgb(255 255 255 / 0.07);
+  --pill-neutral-ink: #c9c9cf;
+  --pill-thinking-bg: rgb(185 140 255 / 0.15);
+  --pill-thinking-ink: #d2b6ff;
+  --pill-accent-bg: rgb(107 140 255 / 0.15);
+  --pill-accent-ink: #a9bcff;
 
-  --grid: #2b2a30;
-  --chart-1: #f2f2f3;
+  --grid: #26262c;
+  --chart-1: #f5f5f7;
 
-  --glass: rgb(28 27 32 / 0.72);
-  --glass-strong: rgb(24 23 28 / 0.86);
-  --glass-edge: rgb(255 255 255 / 0.07);
-  --float-shadow: 0 18px 48px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
-  --card-shadow: 0 12px 28px rgb(0 0 0 / 0.2);
+  --glass: rgb(24 24 28 / 0.58);
+  --glass-strong: rgb(20 20 24 / 0.82);
+  --glass-edge: rgb(255 255 255 / 0.1);
+  --glass-shine: inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --float-shadow: 0 24px 60px rgb(0 0 0 / 0.5), 0 2px 10px rgb(0 0 0 / 0.35);
+  --card-shadow: 0 12px 28px rgb(0 0 0 / 0.25);
 
-  --radius-card: 6px;
-  --radius-panel: 10px;
+  --radius-card: 14px;
+  --radius-panel: 20px;
   --radius-control: 999px;
-  --radius-field: 6px;
+  --radius-field: 10px;
 
   --gap: 24px;
   --pad: 32px;
   --row: 42px;
   --control-h: 34px;
-  --rail: 56px;
+  --dock-space: 112px; /* room kept free at the bottom of every page for the dock */
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
@@ -85,58 +92,70 @@
   --color-control: var(--control);
   --color-text: var(--text);
   --color-muted: var(--muted);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-thinking: var(--thinking);
   --color-positive: var(--positive);
   --color-negative: var(--negative);
   --color-warning: var(--warning);
-  --font-sans: var(--font-public-sans), Inter, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+  --color-research: var(--agent-research);
+  --color-analyst: var(--agent-analyst);
+  --color-execution: var(--agent-execution);
+  --color-reviewer: var(--agent-reviewer);
+  --font-sans: var(--font-geist), "Inter", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
   --radius-card: var(--radius-card);
   --radius-panel: var(--radius-panel);
 }
 
 /* element defaults live in the base layer so Tailwind utilities always win over them */
 @layer base {
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-html {
-  background: var(--ground);
-  -webkit-text-size-adjust: 100%;
-  text-rendering: optimizeLegibility;
-}
+  html {
+    background: var(--ground);
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
 
-body {
-  margin: 0;
-  background: var(--ground);
-  color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 20px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-::selection {
-  background: rgb(76 141 255 / 0.35);
-  color: #fff;
-}
+  ::selection {
+    background: rgb(139 133 255 / 0.4);
+    color: #fff;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
 
-button {
-  font: inherit;
-  color: inherit;
-}
+  button {
+    font: inherit;
+    color: inherit;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2e2e34 transparent;
+  }
 }
 
 /* tabular figures on every number that updates */
@@ -146,31 +165,89 @@ button {
   letter-spacing: -0.01em;
 }
 
-/* ── the floating layer (the only place glass is allowed) ── */
+/* ── the floating layer: glass ───────────────────────────────────────────────────────────────── */
 .glass {
   background: var(--glass);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--float-shadow);
+  box-shadow: var(--glass-shine), var(--float-shadow);
 }
 .glass-strong {
   background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--float-shadow);
+  box-shadow: var(--glass-shine), var(--float-shadow);
+}
+/* a glass bar that stays put (top bar): blur without the floating shadow */
+.glass-bar {
+  background: rgb(9 9 11 / 0.72);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
 }
 @media (prefers-reduced-transparency: reduce) {
   .glass,
-  .glass-strong {
+  .glass-strong,
+  .glass-bar {
     background: var(--raised);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
 }
 
-/* ── thinking: violet pulse on whatever is generating ── */
+/* ── the spectrum ────────────────────────────────────────────────────────────────────────────── */
+.spectrum-text {
+  background: var(--spectrum);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.spectrum-fill {
+  background: var(--spectrum);
+}
+/* a 1.5px spectrum edge on any rounded element (used on the primary action and the dock) */
+.spectrum-ring {
+  position: relative;
+  isolation: isolate;
+}
+.spectrum-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: var(--spectrum);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* the aurora behind the hero and the closing section: the four agent hues as soft light */
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora > span {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(90px);
+  opacity: 0.55;
+  will-change: transform;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .aurora > span {
+    opacity: 0.3;
+  }
+}
+
+/* ── thinking: a pulse on whatever is generating ─────────────────────────────────────────────── */
 @keyframes nexus-breathe {
   0%,
   100% {
@@ -205,6 +282,14 @@ button {
     transform: none;
   }
 }
+@keyframes nexus-shimmer {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
 .thinking-dot {
   width: 6px;
   height: 6px;
@@ -225,13 +310,11 @@ button {
 .rise {
   animation: nexus-rise var(--t-med) var(--ease) both;
 }
-
-/* scrollbars that recede */
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #333238 transparent;
-  }
+/* a moving spectrum line: running progress bars */
+.spectrum-flow {
+  background: linear-gradient(90deg, var(--agent-research), var(--agent-analyst), var(--agent-execution), var(--agent-reviewer), var(--agent-research));
+  background-size: 200% 100%;
+  animation: nexus-shimmer 2.4s linear infinite;
 }
 
 /* Markdown rendered from agent output */
@@ -287,18 +370,18 @@ button {
   text-align: left;
 }
 
-/* React Flow, restyled to the instrument */
+/* React Flow, restyled */
 .react-flow {
   --xy-background-color: transparent;
-  --xy-edge-stroke: #4a4a50;
+  --xy-edge-stroke: #44444c;
   --xy-edge-stroke-selected: var(--accent);
   --xy-edge-stroke-width: 1.5;
   --xy-connectionline-stroke: var(--accent);
   --xy-handle-background-color: var(--surface);
-  --xy-handle-border-color: #5a5a62;
+  --xy-handle-border-color: #5a5a64;
   --xy-node-boxshadow-selected: none;
-  --xy-selection-background-color: rgb(76 141 255 / 0.08);
-  --xy-selection-border: 1px solid rgb(76 141 255 / 0.5);
+  --xy-selection-background-color: rgb(107 140 255 / 0.08);
+  --xy-selection-border: 1px solid rgb(107 140 255 / 0.5);
   --xy-controls-button-background-color: transparent;
   --xy-minimap-background-color: var(--surface);
   --xy-attribution-background-color: transparent;
@@ -311,7 +394,9 @@ button {
   width: 10px;
   height: 10px;
   border-width: 1.5px;
-  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
 }
 .react-flow__handle:hover {
   border-color: var(--accent);
@@ -323,7 +408,7 @@ button {
   animation: nexus-dash 0.6s linear infinite;
 }
 .react-flow__edge.done path.react-flow__edge-path {
-  stroke: #6a6a72;
+  stroke: #6a6a74;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -337,63 +422,9 @@ button {
   }
 }
 
-/* ── landing motion ──────────────────────────────────────────────────────────────
-   Signature: each headline line rises from behind its own baseline. Everything else
-   is a short staggered rise as it enters. Content is visible without JavaScript. */
-.mask-line {
-  display: block;
-  overflow: hidden;
-  padding-bottom: 0.06em;
-}
-.mask-line > span {
-  display: block;
-  animation: nexus-mask 900ms var(--ease-out-strong) both;
-}
-@keyframes nexus-mask {
-  from {
-    transform: translateY(105%);
-  }
-  to {
-    transform: none;
-  }
-}
-.fade-up {
-  animation: nexus-fade-up 700ms var(--ease-out-strong) both;
-}
-@keyframes nexus-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.reveal-ready [data-reveal] {
-  opacity: 0;
-  transform: translateY(24px);
-  transition:
-    opacity 700ms var(--ease-out-strong),
-    transform 700ms var(--ease-out-strong);
-  transition-delay: var(--d, 0ms);
-}
-.reveal-ready [data-reveal].is-in {
-  opacity: 1;
-  transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .reveal-ready [data-reveal] {
-    opacity: 1;
-    transform: none;
-  }
-  .mask-line > span,
-  .fade-up {
-    animation: none;
-  }
-}
-
-/* the page sets every figure in the text face; monospace stays inside the app */
+/* ── landing ─────────────────────────────────────────────────────────────────────────────────
+   GSAP drives every entrance. Content is visible without JavaScript: `.js-motion` is added by
+   the page only once GSAP is ready, and only then are [data-reveal] items hidden for their entrance. */
 .landing .num {
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
@@ -409,4 +440,30 @@ button {
 }
 .drift {
   animation: nexus-drift 14s ease-in-out infinite alternate;
+}
+/* split headline pieces: words keep their kerning, chars avoid layout shift */
+.split-line {
+  overflow: clip;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+/* the relay scene: steps take turns in one place only while the pinned animation runs */
+.relay-pinned .relay-steps {
+  min-height: 270px;
+}
+.relay-pinned [data-step] {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  margin: 0;
+}
+
+/* the pipeline: a native swipe row, until the pinned sideways scroll takes over on desktop */
+.pipeline-pinned .pipeline-track {
+  overflow: hidden;
+  scroll-snap-type: none;
+}
+.pipeline-track::-webkit-scrollbar {
+  display: none;
 }

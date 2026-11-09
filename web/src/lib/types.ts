@@ -1,3 +1,7 @@
+/** Heterogeneous JSON from the server (event payloads, step outputs); read fields defensively. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type JsonObject = Record<string, any>;
+
 export type AgentType = "research" | "analyst" | "execution" | "reviewer";
 
 export type RunStatus = "queued" | "running" | "awaiting_approval" | "succeeded" | "failed" | "cancelled" | "timed_out";
@@ -104,7 +108,7 @@ export interface Step {
   attempt: number;
   status: "running" | "succeeded" | "failed" | "awaiting_approval" | "cancelled";
   input_summary: string;
-  output: Record<string, any> | null;
+  output: JsonObject | null;
   error: string | null;
   tools: ToolCall[];
   tokens_in: number;
@@ -184,7 +188,7 @@ export interface LifecycleEvent {
   run_id: string | null;
   step_id?: string | null;
   occurred_at: string;
-  payload: Record<string, any>;
+  payload: JsonObject;
 }
 
 export interface DocumentRow {

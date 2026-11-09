@@ -1,8 +1,11 @@
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_LIBPQ_ONLY = {"sslmode", "channel_binding", "sslrootcert", "sslcert", "sslkey", "options", "target_session_attrs"}
 
 
 class Settings(BaseSettings):
@@ -17,9 +20,18 @@ class Settings(BaseSettings):
 
     # Process topology. "embedded" runs the outbox relay, worker and projector inside the API
     # process (handy without Docker). In Compose each role runs as its own container.
-    run_mode: Literal["embedded", "api", "worker", "projector"] = "embedded"
+    # "serverless" (Vercel) runs no background loops: requests flush the outbox themselves,
+    # commands go to a queue whose consumer runs each run to completion, and lifecycle events
+    # are projected in the process that produced them.
+    run_mode: Literal["embedded", "api", "worker", "projector", "serverless"] = "embedded"
+    # serverless only: "vercel" sends commands to Vercel Queues; "inline" runs them in-process
+    # (local testing of the serverless code path without Vercel)
+    command_queue: Literal["vercel", "inline"] = "vercel"
+    queue_topic: str = "nexus-commands"
 
     database_url: str = "postgresql+asyncpg://nexus:nexus@localhost:5432/nexus"
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
     redis_url: str | None = None
     event_bus: Literal["kafka", "memory"] = "memory"
     kafka_bootstrap_servers: str = "localhost:9092"
@@ -35,12 +47,15 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # LLM
-    llm_provider: Literal["openai", "anthropic", "ollama"] = "openai"
+    llm_provider: Literal["openai", "anthropic", "google", "ollama"] = "openai"
     llm_model: str = "gpt-4.1-mini"
     llm_temperature: float = 0.2
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     anthropic_api_key: str | None = None
+    google_api_key: str | None = None  # Gemini (Google AI Studio)
+    # cap on each model reply; keeps free-tier quotas (Gemini) and costs predictable
+    llm_max_output_tokens: int = 4096
     ollama_base_url: str = "http://localhost:11434"
 
     # Embeddings: "local" runs BAAI/bge-small-en-v1.5 on CPU through fastembed and needs no key.
@@ -51,6 +66,8 @@ class Settings(BaseSettings):
 
     # Uploads
     upload_dir: str = "uploads"
+    # "database" keeps file bytes in Postgres, for hosts without a shared disk (serverless)
+    upload_storage: Literal["disk", "database"] = "disk"
     max_upload_mb: int = 20
 
     # Execution guards
@@ -74,6 +91,10 @@ class Settings(BaseSettings):
     rate_limit_runs: int = 30
     rate_limit_ask: int = 60
 
+    # Token deltas are coalesced for this many ms before publishing (0 = every token). Saves
+    # commands on metered Redis such as Upstash.
+    token_flush_ms: int = 0
+
     @field_validator("database_url")
     @classmethod
     def _async_driver(cls, v: str) -> str:
@@ -83,8 +104,28 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
-        """Plain libpq URL (used by the LangGraph checkpointer and Alembic)."""
+        """Plain libpq URL (used by the LangGraph checkpointer and Alembic). Keeps sslmode."""
         return self.database_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+
+    @property
+    def async_database_url(self) -> str:
+        """The asyncpg URL without libpq-only query options (sslmode, channel_binding, ...).
+
+        Hosted Postgres (Neon, Supabase) hands out URLs with ``?sslmode=require``, which asyncpg
+        rejects; TLS is passed through :attr:`async_connect_args` instead.
+        """
+        parts = urlsplit(self.database_url)
+        keep = [(k, v) for k, v in parse_qsl(parts.query) if k not in _LIBPQ_ONLY]
+        return urlunsplit(parts._replace(query=urlencode(keep)))
+
+    @property
+    def async_connect_args(self) -> dict[str, Any]:
+        mode = dict(parse_qsl(urlsplit(self.database_url).query)).get("sslmode")
+        return {"ssl": "require"} if mode in ("require", "verify-ca", "verify-full") else {}
+
+    @property
+    def serverless(self) -> bool:
+        return self.run_mode == "serverless"
 
     @property
     def llm_configured(self) -> bool:
@@ -92,6 +133,8 @@ class Settings(BaseSettings):
             return bool(self.openai_api_key)
         if self.llm_provider == "anthropic":
             return bool(self.anthropic_api_key)
+        if self.llm_provider == "google":
+            return bool(self.google_api_key)
         return True  # ollama needs no key; reachability is checked by /health/config
 
     @property

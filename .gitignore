@@ -19,3 +19,7 @@ web/test-results/
 web/playwright-report/
 web/next-env.d.ts
 .kafka/
+
+# deploy
+.vercel/
+web/tsconfig.tsbuildinfo

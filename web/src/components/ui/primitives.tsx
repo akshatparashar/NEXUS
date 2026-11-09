@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { RotateCw, X } from "lucide-react";
 import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useMounted } from "@/lib/hooks";
 
 /* ── Card ─────────────────────────────────────────────────────────────────────────── */
 
@@ -24,7 +25,7 @@ export function Card({
   bodyClassName?: string;
 }) {
   return (
-    <section className={clsx("flex min-w-0 flex-col rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)]", className)}>
+    <section className={clsx("flex min-w-0 flex-col rounded-[var(--radius-card)] bg-surface shadow-[inset_0_1px_0_rgb(255_255_255_/_0.05),0_0_0_1px_rgb(255_255_255_/_0.04)]", className)}>
       {(title || action) && (
         <header className="flex min-h-[52px] items-center justify-between gap-3 px-5 pt-4 pb-2">
           <div className="min-w-0">
@@ -123,10 +124,10 @@ export function Segmented<T extends string>({
 /* ── Fields ──────────────────────────────────────────────────────────────────────── */
 
 const fieldBase =
-  "w-full rounded-[var(--radius-field)] border border-control bg-[#0f0e12] px-3 text-[13px] text-text placeholder:text-muted outline-none transition-[border-color,box-shadow] duration-150 hover:border-[var(--control-hover)] focus:border-accent focus:shadow-[0_0_0_3px_rgb(76_141_255_/_0.18)] disabled:opacity-50";
+  "w-full rounded-[var(--radius-field)] border border-white/[0.08] bg-white/[0.04] px-3 text-[13px] text-text placeholder:text-muted outline-none transition-[border-color,box-shadow,background-color] duration-150 hover:border-white/[0.14] focus:border-accent focus:bg-white/[0.06] focus:shadow-[0_0_0_4px_rgb(107_140_255_/_0.2)] disabled:opacity-50";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={clsx(fieldBase, "h-[34px]", className)} {...rest} />;
+  return <input ref={ref} className={clsx(fieldBase, "h-9", className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
@@ -174,14 +175,14 @@ export function Switch({ checked, onChange, label, id }: { checked: boolean; onC
       aria-label={label}
       onClick={() => onChange(!checked)}
       className={clsx(
-        "relative h-5 w-9 flex-none rounded-full border transition-colors duration-200",
-        checked ? "border-accent bg-accent" : "border-control bg-[#0f0e12]",
+        "relative h-[22px] w-[38px] flex-none rounded-full transition-colors duration-200",
+        checked ? "bg-positive" : "bg-white/[0.16]",
       )}
     >
       <span
         className={clsx(
-          "absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full transition-[left,background-color] duration-200 ease-[var(--ease)]",
-          checked ? "left-[18px] bg-white" : "left-[2px] bg-[#8a8c92]",
+          "absolute top-1/2 size-[18px] -translate-y-1/2 rounded-full bg-white shadow-[0_2px_6px_rgb(0_0_0_/_0.35)] transition-[left] duration-200 ease-[var(--ease-out-strong)]",
+          checked ? "left-[18px]" : "left-[2px]",
         )}
       />
     </button>
@@ -319,8 +320,7 @@ export function Dialog({
   width?: number;
 }) {
   const id = useId();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -333,7 +333,7 @@ export function Dialog({
       {open && (
         <div className="fixed inset-0 z-[80] flex items-start justify-center px-4 pt-[12vh]">
           <motion.div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -348,7 +348,7 @@ export function Dialog({
             exit={{ opacity: 0, y: 6, scale: 0.99, transition: { duration: 0.12 } }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             style={{ width }}
-            className="glass-strong relative max-w-full rounded-[14px] p-6"
+            className="glass-strong relative max-w-full rounded-[var(--radius-panel)] p-6"
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -395,10 +395,10 @@ export function Tip({ label, children, side = "right" }: { label: string; childr
 
 export function PageHeader({ title, sub, actions }: { title: React.ReactNode; sub?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[26px] font-semibold leading-8 tracking-[-0.015em]">{title}</h1>
-        {sub && <p className="mt-1 max-w-[80ch] text-[14px] leading-5 text-muted">{sub}</p>}
+        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.03em] md:text-[34px] md:leading-10">{title}</h1>
+        {sub && <p className="mt-1.5 max-w-[80ch] text-[15px] leading-6 text-muted">{sub}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

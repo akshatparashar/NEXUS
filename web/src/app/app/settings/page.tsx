@@ -123,7 +123,7 @@ function Setup({ provider }: { provider: string }) {
         : ["LLM_PROVIDER=openai", "LLM_MODEL=gpt-4.1-mini", "OPENAI_API_KEY=sk-…"];
   return (
     <div className="mb-2 mt-3 rounded-[8px] bg-[var(--pill-warning-bg)] p-3 text-[13px]">
-      <p className="text-[var(--pill-warning-ink)]">Agents can't run until a model is configured. Add these to <span className="num">.env</span> and restart the API:</p>
+      <p className="text-[var(--pill-warning-ink)]">Agents can&apos;t run until a model is configured. Add these to <span className="num">.env</span> and restart the API:</p>
       <pre className="num mt-2 overflow-x-auto rounded-[6px] bg-black/30 p-2.5 text-[12px] leading-5 text-text">{lines.join("\n")}</pre>
       <p className="mt-2 text-[12px] text-muted">No key? Set LLM_PROVIDER=ollama and run a local model for free.</p>
     </div>

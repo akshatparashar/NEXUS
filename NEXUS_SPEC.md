@@ -3,6 +3,14 @@
 > The improved build prompt. This file replaces the original prompt and is the working spec for every phase.
 > Design direction is informed by the `design-taste-frontend` (tasteskill) and `apple-design` (HIG) skills; both run again at Phase 6 and as review gates later on.
 
+> **Where the build deviated from this spec (updated 2026-11-09).** The sections below have been edited to match the code; this list is the summary.
+> - Event code lives in `backend/app/events/` (envelope, outbox + relay, bus, consumer base, pub/sub), not `kafka/`. The bus has two implementations, `KafkaBus` and an in-process `MemoryBus` with the same consumer-group semantics, so tests and single-process dev need no broker. Workers live in `app/workers/`.
+> - `RUN_MODE=embedded|api|worker|projector` picks the role; `embedded` runs all three in one process.
+> - Token deltas go straight to pub/sub (not through Kafka); only lifecycle events take the outbox → Kafka → projector path.
+> - Embeddings default to local `BAAI/bge-small-en-v1.5` (384 d, CPU via fastembed), so the knowledge base works without a key; `text-embedding-3-small` at 384 d is the option.
+> - Type is **Public Sans** with **JetBrains Mono** for figures, IDs and payloads, not Geist. Colour tokens come from the tasteskill *data-terminal* app style (section 6 lists the real values).
+> - npm instead of pnpm. Backend tests use an embedded Postgres (`pgserver`) or `TEST_DATABASE_URL` instead of testcontainers.
+
 ---
 
 ## 0. What we are building, in one sentence
@@ -83,13 +91,13 @@ It is **not** a chatbot with extra pages. The Playground is a debugging surface 
 
 | Layer | Choice |
 |---|---|
-| Web | Next.js (App Router, latest stable), TypeScript strict, Tailwind v4, `motion` (Framer Motion), `@xyflow/react`, TanStack Query, Zustand (canvas state), `cmdk`, Lucide, Geist Sans |
+| Web | Next.js (App Router, latest stable), TypeScript strict, Tailwind v4, `motion` (Framer Motion), `@xyflow/react`, TanStack Query, Zustand (canvas state), `cmdk`, Lucide, Public Sans + JetBrains Mono (figures) |
 | API | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async + asyncpg, Alembic, `structlog`, `uv` for deps |
 | AI | LangGraph + `langgraph-checkpoint-postgres`, LangChain `init_chat_model`, structured outputs via Pydantic |
-| RAG | `pypdf`, recursive token chunker (≈512 tokens / 64 overlap), embeddings (OpenAI `text-embedding-3-small` or Ollama `nomic-embed-text`), pgvector HNSW + `tsvector` GIN, RRF fusion |
+| RAG | `pypdf`, recursive token chunker (≈512 tokens / 64 overlap), embeddings (local `BAAI/bge-small-en-v1.5` via fastembed by default, or OpenAI `text-embedding-3-small` at 384 d), pgvector HNSW + `tsvector` GIN, RRF fusion |
 | Messaging | Apache Kafka (official `apache/kafka` image, KRaft, no ZooKeeper), `aiokafka` |
 | Infra | Docker Compose (profiles: `core`, `ollama`), healthchecks, `.env` via `pydantic-settings` |
-| Tests | pytest + pytest-asyncio, testcontainers (Postgres, Kafka), LangChain fake chat model **in tests only**; Playwright e2e and screenshot capture |
+| Tests | pytest + pytest-asyncio against an embedded Postgres (`pgserver`) or `TEST_DATABASE_URL`, `MemoryBus`, a fake chat model **in tests only**; Playwright e2e (with an extractive test-double LLM, `scripts/e2e_server.py`) and screenshot capture |
 
 ---
 
@@ -108,8 +116,9 @@ backend/
     tools/         registry.py (allowlist + `destructive` flag), kb_search, http_get, write_report, send_webhook(destructive)
     orchestration/ compiler.py (canvas JSON → StateGraph), state.py, routing.py, guards.py (timeouts, caps)
     rag/           parsing.py, chunking.py, embeddings.py, retrieval.py (hybrid + RRF), citations.py
-    kafka/         producer.py, outbox_relay.py, consumer_base.py (idempotency, retry, DLQ), topics.py
-    workers/       run_worker.py, ingest_worker.py, projector.py
+    events/        envelope.py (topics + event types), outbox.py (relay), bus.py (KafkaBus | MemoryBus),
+                   consumer.py (idempotency, retry, DLQ), emitter.py, pubsub.py (Redis | in-process)
+    workers/       runtime.py (role by RUN_MODE), command_consumer.py, run_executor.py, projector.py, checkpointer.py
     main.py
   migrations/      Alembic
   tests/           unit/, integration/, e2e-api/
@@ -188,23 +197,25 @@ The competitor test: "a run trace that is literally your canvas compiling into s
 | Violet + electric blue | **One colour = one meaning.** Electric blue is *the* accent (actions, selection, focus). Violet is a **signal**, not a decoration: it means only "an LLM is thinking right now" (active node pulse, streaming caret). The result reads as purposeful, not as a purple AI template. |
 | Gradients, glows | None at rest. The one allowed exception is the faint moving highlight on an **active** edge during a run, because it carries meaning. |
 | Cards everywhere | Surfaces are separated by tone steps, not borders or shadows. Shadows only on things that float. |
-| Typography | **Geist Sans** for everything. Large tight display type on the landing page (tracking −0.03em, leading 0.95). Two or three working sizes in the app. Monospace **only** for real code, JSON payloads and IDs inside log viewers. No uppercase tracked labels, no eyebrow chips, no 01/02/03 numbering. |
+| Typography | **Public Sans** for everything (as built; Geist was the original plan), **JetBrains Mono** for figures inside the app. Large tight display type on the landing page (tracking −0.03em, leading 0.95). Two or three working sizes in the app. Monospace **only** for real code, JSON payloads and IDs inside log viewers. No uppercase tracked labels, no eyebrow chips, no 01/02/03 numbering. |
 
-### Tokens (dark-first; light mode follows later from the same roles)
-| Role | Hex | Contrast vs ground |
+### Tokens (as built: tasteskill *data-terminal* style, dark-first; source of truth is `web/src/app/globals.css`)
+| Role | Hex | Contrast vs ground / card |
 |---|---|---|
-| `--ground` | `#0A0B0D` | — |
-| `--surface-1` | `#111317` | tone step |
-| `--surface-2` | `#171A1F` | tone step |
-| `--surface-3` | `#1E2128` | hover / selected |
-| `--ink` | `#EDEEF0` | ≈ 17:1 |
-| `--ink-2` (secondary) | `#9EA3AD` | ≈ 7.5:1 |
-| `--accent` electric blue | `#4C8DFF` | ≈ 6.2:1 |
-| `--thinking` violet (signal only) | `#A88BFA` | ≈ 7:1 |
-| `--ok` / `--warn` / `--fail` | `#3FCF8E` / `#F5B544` / `#F2555A` | all ≥ 4.5:1 |
-| `--glass` | `rgb(23 26 31 / 0.72)` + `backdrop-filter: blur(20px) saturate(140%)` | floating layer only |
+| `--ground` | `#171719` | — |
+| `--surface` (cards sit **darker** than the ground) | `#131217` | tone step |
+| `--raised` (nested panels, hover) / `--active` | `#212023` / `#26252a` | tone step |
+| `--well` (builder canvas) | `#101013` | tone step |
+| `--text` | `#F2F2F3` | 16.0 / 16.7 : 1 |
+| `--muted` (secondary) | `#8A8C92` | 5.3 / 5.5 : 1 |
+| `--accent` electric blue (and `--accent-ink` for text) | `#4C8DFF` / `#7FADFF` | 5.6 / 7.9 : 1 |
+| `--thinking` violet (signal only) | `#A88BFA` | 6.6 : 1 |
+| `--positive` / `--warning` / `--negative` | `#44A282` / `#D9A441` / `#E5566F` | 5.7 / 8.0 / 5.0 : 1 |
+| `--agent-*` (research, analyst, execution, reviewer) | muted tints | node-type tiles only, never status |
+| `--glass` | `rgb(28 27 32 / 0.72)` + backdrop blur | floating layer only |
 
-Radius: 10px for controls and 14px for panels, applied the same everywhere. Motion: 160ms for UI feedback and 240–320ms for layout, using `cubic-bezier(0.2, 0.8, 0.2, 1)`, with a full `prefers-reduced-motion` fallback. Status is always shown with an icon or label plus colour, never colour alone.
+Radius (as built): 6px cards and fields, 10px panels, pill-shaped controls.
+Motion: 160ms for UI feedback and 240–320ms for layout, using `cubic-bezier(0.2, 0.8, 0.2, 1)`, with a full `prefers-reduced-motion` fallback. Status is always shown with an icon or label plus colour, never colour alone.
 
 ### Screens
 **Landing (a page; follows the tasteskill page run):**
@@ -272,6 +283,6 @@ Source (`web/`, `backend/`), `docker-compose.yml`, Alembic migrations, `.env.exa
 ## 11. Defaults chosen (change any of them before Phase 1)
 
 - **LLM:** configurable. Default `openai:gpt-4.1-mini`-class model plus `text-embedding-3-small`. `LLM_PROVIDER=ollama` runs fully local for free (the `ollama` compose profile).
-- **Package managers:** `uv` (Python) and `pnpm` (web).
+- **Package managers:** `uv` (Python) and npm (web; pnpm was the original plan).
 - **Repo:** single git repo, monorepo folders, no Turborepo.
 - **Deployment target:** Docker Compose locally. Cloud deploy is out of MVP scope.

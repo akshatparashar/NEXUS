@@ -12,11 +12,14 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine, _sessionmaker
     if _engine is None:
+        s = get_settings()
         _engine = create_async_engine(
-            get_settings().database_url,
-            pool_size=10,
-            max_overflow=20,
+            s.async_database_url,
+            connect_args=s.async_connect_args,
+            pool_size=s.db_pool_size,
+            max_overflow=s.db_max_overflow,
             pool_pre_ping=True,
+            pool_recycle=300,  # hosted Postgres closes idle connections
         )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine

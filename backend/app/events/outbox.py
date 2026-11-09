@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.database.session import session_scope
 from app.events.bus import get_bus
@@ -37,6 +38,25 @@ def enqueue(session: AsyncSession, topic: str, envelope: EventEnvelope) -> None:
 def nudge() -> None:
     """Wake the relay right away (called after a commit that enqueued messages)."""
     _wakeup.set()
+
+
+async def flush() -> None:
+    """Send committed outbox rows on their way. Call it after a commit that enqueued messages.
+
+    Long-running processes just wake the relay. In serverless mode there is no relay, so the
+    request publishes its own rows before it returns (and anything left behind is picked up by
+    the next request that flushes).
+    """
+    if not get_settings().serverless:
+        nudge()
+        return
+    for _ in range(20):
+        try:
+            if await relay_once() == 0:
+                return
+        except Exception:
+            log.exception("outbox_flush_failed")
+            return
 
 
 async def relay_once(batch: int = 200) -> int:

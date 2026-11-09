@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError, Conflict, NotFound, ValidationFailed
 from app.events import envelope as ev
 from app.events.envelope import EventEnvelope
-from app.events.outbox import enqueue, nudge
+from app.events.outbox import enqueue, flush
 from app.models import Chunk, Document, User, Workspace
 from app.rag.parsing import UnsupportedDocument, sniff_type
 
@@ -46,10 +46,15 @@ async def upload(session: AsyncSession, ws: Workspace, user: User, file: UploadF
         raise Conflict(f"This file is already in the knowledge base as {existing.filename}.", code="duplicate_document")
 
     doc_id = uuid.uuid4()
-    folder = Path(s.upload_dir) / str(ws.id)
-    path = folder / f"{doc_id}{Path(filename).suffix.lower()}"
-    await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
-    await asyncio.to_thread(path.write_bytes, bytes(data))
+    content: bytes | None = None
+    if s.upload_storage == "database":
+        storage_path, content = f"db://{doc_id}", bytes(data)
+    else:
+        folder = Path(s.upload_dir) / str(ws.id)
+        path = folder / f"{doc_id}{Path(filename).suffix.lower()}"
+        await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(path.write_bytes, bytes(data))
+        storage_path = str(path.resolve())
 
     doc = Document(
         id=doc_id,
@@ -58,7 +63,8 @@ async def upload(session: AsyncSession, ws: Workspace, user: User, file: UploadF
         mime=mime,
         size_bytes=len(data),
         sha256=sha,
-        storage_path=str(path.resolve()),
+        storage_path=storage_path,
+        content=content,
         status="uploaded",
         uploaded_by=user.id,
     )
@@ -69,7 +75,7 @@ async def upload(session: AsyncSession, ws: Workspace, user: User, file: UploadF
         EventEnvelope(type=ev.DOCUMENT_UPLOADED, workspace_id=ws.id, payload={"document_id": str(doc_id), "filename": filename}),
     )
     await session.commit()
-    nudge()
+    await flush()
     return doc
 
 
@@ -79,11 +85,13 @@ async def remove(session: AsyncSession, ws: Workspace, doc_id: uuid.UUID) -> Non
     ).scalars().first()
     if doc is None:
         raise NotFound("Document not found.")
+    on_disk = not doc.storage_path.startswith("db://")
     path = Path(doc.storage_path)
     await session.execute(delete(Chunk).where(Chunk.document_id == doc.id))
     await session.delete(doc)
     await session.commit()
-    await asyncio.to_thread(path.unlink, missing_ok=True)
+    if on_disk:
+        await asyncio.to_thread(path.unlink, missing_ok=True)
 
 
 async def reprocess(session: AsyncSession, ws: Workspace, doc_id: uuid.UUID) -> Document:
@@ -101,5 +109,5 @@ async def reprocess(session: AsyncSession, ws: Workspace, doc_id: uuid.UUID) -> 
         EventEnvelope(type=ev.DOCUMENT_UPLOADED, workspace_id=ws.id, payload={"document_id": str(doc.id), "filename": doc.filename}),
     )
     await session.commit()
-    nudge()
+    await flush()
     return doc

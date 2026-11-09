@@ -3,7 +3,7 @@
 import { clsx } from "clsx";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Play, RotateCcw, Search, ShieldAlert } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AgentTile } from "@/components/agent-tile";
 import { AGENTS } from "@/lib/agents";
 import type { AgentType } from "@/lib/types";
@@ -36,24 +36,36 @@ export function HeroRun() {
     raf.current = null;
   };
 
-  const tick = useCallback(() => {
-    const t = performance.now() - base.current;
-    if (approvalBeat && t >= approvalBeat.at && pausedAt.current === null && !decisionRef.current) {
-      pausedAt.current = approvalBeat.at;
-      setClock(approvalBeat.at);
-      setPhase("approval");
-      stop();
-      return;
-    }
-    if (t >= end) {
-      setClock(end);
-      setPhase("done");
-      stop();
-      return;
-    }
-    setClock(t);
-    raf.current = requestAnimationFrame(tick);
+  // the animation loop lives in a ref so it only ever runs from requestAnimationFrame, never during render
+  const tick = useRef<() => void>(() => {});
+  useEffect(() => {
+    tick.current = () => {
+      const t = performance.now() - base.current;
+      if (approvalBeat && t >= approvalBeat.at && pausedAt.current === null && !decisionRef.current) {
+        pausedAt.current = approvalBeat.at;
+        setClock(approvalBeat.at);
+        setPhase("approval");
+        stop();
+        return;
+      }
+      if (t >= end) {
+        setClock(end);
+        setPhase("done");
+        stop();
+        return;
+      }
+      setClock(t);
+      raf.current = requestAnimationFrame(tick.current);
+    };
   }, [approvalBeat, end]);
+
+  // the hero's "Watch a run" button asks for playback through a window event
+  const playRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const onPlay = () => playRef.current();
+    window.addEventListener("nexus:play-hero", onPlay);
+    return () => window.removeEventListener("nexus:play-hero", onPlay);
+  }, []);
 
   const play = () => {
     stop();
@@ -63,7 +75,7 @@ export function HeroRun() {
     base.current = performance.now();
     setClock(0);
     setPhase("playing");
-    raf.current = requestAnimationFrame(tick);
+    raf.current = requestAnimationFrame(tick.current);
   };
 
   const decide = (d: "approved" | "rejected") => {
@@ -71,16 +83,19 @@ export function HeroRun() {
     setDecision(d);
     base.current = performance.now() - (pausedAt.current ?? 0);
     setPhase("playing");
-    raf.current = requestAnimationFrame(tick);
+    raf.current = requestAnimationFrame(tick.current);
   };
 
-  useEffect(() => () => stop(), []);
-  useEffect(() => {
+  const choose = (id: string) => {
+    if (id === traceId) return;
     stop();
+    setTraceId(id);
     setPhase("ready");
     setClock(0);
     setDecision(null);
-  }, [traceId]);
+  };
+
+  useEffect(() => () => stop(), []);
 
   // derive the canvas state at `clock`
   const { nodes, current, texts, tools, revise } = useMemo(() => {
@@ -114,11 +129,15 @@ export function HeroRun() {
     return { nodes, current, texts, tools, revise };
   }, [clock, phase, trace, decision]);
 
+  useEffect(() => {
+    playRef.current = play;
+  });
+
   const last = texts[texts.length - 1];
   const seconds = (clock / 1000).toFixed(1);
 
   return (
-    <div data-ui className="w-full max-w-[560px] select-none rounded-[14px] bg-surface p-4 text-[13px] text-text shadow-[0_24px_64px_rgb(0_0_0_/_0.45)] sm:p-5">
+    <div data-ui className="w-full select-none p-4 text-[13px] text-text sm:p-5">
       {/* task chooser */}
       <div className="flex items-center justify-between gap-3">
         <div role="radiogroup" aria-label="Choose a task" className="flex min-w-0 flex-wrap items-center gap-x-4">
@@ -127,11 +146,11 @@ export function HeroRun() {
               key={t.id}
               role="radio"
               aria-checked={t.id === traceId}
-              onClick={() => setTraceId(t.id)}
+              onClick={() => choose(t.id)}
               className={clsx("relative h-7 flex-none whitespace-nowrap text-[13px] transition-colors", t.id === traceId ? "text-text" : "text-muted hover:text-text")}
             >
               {t.label}
-              <span className={clsx("absolute inset-x-0 bottom-0 h-px bg-accent transition-opacity", t.id === traceId ? "opacity-100" : "opacity-0")} />
+              <span className={clsx("spectrum-fill absolute inset-x-0 bottom-0 h-[2px] rounded-full transition-opacity", t.id === traceId ? "opacity-100" : "opacity-0")} />
             </button>
           ))}
         </div>
@@ -142,12 +161,12 @@ export function HeroRun() {
       </p>
 
       {/* the canvas */}
-      <div className="relative mt-3 rounded-[10px] bg-well px-3 pb-4 pt-9">
+      <div className="relative mt-3 rounded-[14px] bg-black/40 px-3 pb-4 pt-9">
         <svg className="pointer-events-none absolute inset-x-3 top-1 h-9 w-[calc(100%-24px)]" viewBox="0 0 100 36" preserveAspectRatio="none" aria-hidden>
           <path
             d="M 87.5 34 C 87.5 6, 37.5 6, 37.5 34"
             fill="none"
-            stroke={revise && nodes.analyst.revision > 0 && nodes.analyst.status !== "done" ? "var(--thinking)" : "#55555c"}
+            stroke={revise && nodes.analyst.revision > 0 && nodes.analyst.status !== "done" ? "var(--agent-reviewer)" : "#4a4a52"}
             strokeWidth="0.6"
             strokeDasharray="1.6 1.6"
             vectorEffect="non-scaling-stroke"
@@ -161,8 +180,8 @@ export function HeroRun() {
               {i < 3 && (
                 <span
                   className={clsx(
-                    "absolute -right-2 top-1/2 h-px w-2",
-                    nodes[ORDER[i + 1]].status !== "idle" && nodes[t].status === "done" ? "bg-[#8a8c92]" : "bg-[#3a3a3e]",
+                    "absolute -right-2 top-1/2 h-[2px] w-2 rounded-full transition-colors duration-500",
+                    nodes[ORDER[i + 1]].status !== "idle" && nodes[t].status === "done" ? "spectrum-fill" : "bg-[#34343b]",
                   )}
                 />
               )}
@@ -172,12 +191,12 @@ export function HeroRun() {
       </div>
 
       {/* readout */}
-      <div className="mt-3 min-h-[132px] rounded-[10px] bg-[#0f0e12] p-3.5" aria-live="polite">
+      <div className="mt-3 min-h-[132px] rounded-[14px] bg-black/40 p-3.5" aria-live="polite">
         <AnimatePresence mode="wait" initial={false}>
           {phase === "ready" && (
             <motion.div key="ready" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-[104px] flex-col justify-between">
               <p className="leading-5 text-muted">Four agents will research your documents, analyse the findings, act on them and review the result. Press Run to watch.</p>
-              <button onClick={play} className="flex w-fit items-center gap-2 rounded-full bg-[#f2f2f3] px-4 py-1.5 text-[13px] font-medium text-[#111114] transition-transform active:scale-[0.97]">
+              <button onClick={play} className="spectrum-fill flex w-fit items-center gap-2 rounded-full px-4 py-1.5 text-[13px] font-semibold text-[#0b0b0d] transition-[transform,filter] hover:brightness-110 active:scale-[0.97]">
                 <Play className="size-3.5" /> Run
               </button>
             </motion.div>
@@ -192,10 +211,10 @@ export function HeroRun() {
                 </span>
               </p>
               <div className="flex gap-2">
-                <button onClick={() => decide("approved")} className="rounded-full bg-[#f2f2f3] px-4 py-1.5 text-[13px] font-medium text-[#111114] transition-transform active:scale-[0.97]">
+                <button onClick={() => decide("approved")} className="rounded-full bg-[#f5f5f7] px-4 py-1.5 text-[13px] font-medium text-[#0b0b0d] transition-transform active:scale-[0.97]">
                   Approve
                 </button>
-                <button onClick={() => decide("rejected")} className="rounded-full border border-control px-4 py-1.5 text-[13px] transition-colors hover:bg-raised active:scale-[0.97]">
+                <button onClick={() => decide("rejected")} className="rounded-full bg-white/[0.08] px-4 py-1.5 text-[13px] transition-colors hover:bg-white/[0.14] active:scale-[0.97]">
                   Reject
                 </button>
               </div>
@@ -240,7 +259,7 @@ export function HeroRun() {
           )}
         </AnimatePresence>
       </div>
-      <p className="mt-2.5 text-[11px] text-muted">A recorded run, replayed in the real canvas components. Your decision changes the outcome.</p>
+      <p className="mt-2.5 text-[11px] text-muted">A recorded run, replayed with the real canvas parts. Your decision changes the outcome.</p>
     </div>
   );
 }
@@ -262,9 +281,10 @@ function MiniNode({ type, state }: { type: AgentType; state: NodeState }) {
   return (
     <div
       className={clsx(
-        "rounded-[8px] border bg-surface px-2 py-2 transition-[border-color] duration-300",
-        state.status === "running" ? "border-thinking" : state.status === "waiting" ? "border-warning" : "border-[#2a292e]",
+        "rounded-[10px] border bg-surface px-2 py-2 transition-[border-color,box-shadow,transform] duration-300",
+        state.status === "running" ? "-translate-y-0.5" : state.status === "waiting" ? "border-warning" : state.status === "done" ? "border-white/10" : "border-white/[0.06]",
       )}
+      style={state.status === "running" ? { borderColor: meta.hue, boxShadow: `0 0 0 3px color-mix(in oklab, ${meta.hue} 22%, transparent), 0 10px 28px color-mix(in oklab, ${meta.hue} 30%, transparent)` } : undefined}
     >
       <div className="flex items-center gap-1.5">
         <AgentTile type={type} size={18} />
@@ -273,8 +293,8 @@ function MiniNode({ type, state }: { type: AgentType; state: NodeState }) {
       <p className="mt-1.5 flex h-4 items-center gap-1 text-[11px]">
         {state.status === "running" && (
           <>
-            <span className="thinking-dot" />
-            <span className="text-[var(--pill-thinking-ink)]">{state.revision ? `rev ${state.revision}` : "working"}</span>
+            <span className="thinking-dot" style={{ background: meta.hue }} />
+            <span style={{ color: meta.hue }}>{state.revision ? `rev ${state.revision}` : "working"}</span>
           </>
         )}
         {state.status === "done" && (

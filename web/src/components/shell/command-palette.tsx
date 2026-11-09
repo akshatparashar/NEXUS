@@ -10,7 +10,6 @@ import {
   Gauge,
   LayoutGrid,
   MessagesSquare,
-  PanelLeft,
   Plus,
   Settings2,
   Upload,
@@ -23,6 +22,7 @@ import { StatusPill } from "@/components/ui/pill";
 import { toast } from "@/components/ui/toast";
 import { get, post } from "@/lib/api";
 import { fmtRelative } from "@/lib/format";
+import { useMounted } from "@/lib/hooks";
 import { useSession } from "@/lib/session";
 import type { RunSummary, Workflow, WorkflowSummary } from "@/lib/types";
 
@@ -41,7 +41,7 @@ export function useCommandPalette() {
   return { open, setOpen };
 }
 
-export function CommandPalette({ open, onOpenChange, onToggleRail }: { open: boolean; onOpenChange: (v: boolean) => void; onToggleRail: () => void }) {
+export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const workspaces = useSession((s) => s.workspaces);
@@ -49,8 +49,7 @@ export function CommandPalette({ open, onOpenChange, onToggleRail }: { open: boo
   const setWorkspace = useSession((s) => s.setWorkspace);
   const { data: workflows } = useQuery({ queryKey: ["workflows"], queryFn: () => get<WorkflowSummary[]>("/workflows"), enabled: open });
   const { data: runs } = useQuery({ queryKey: ["runs", "palette"], queryFn: () => get<RunSummary[]>("/runs?limit=8"), enabled: open });
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   const go = (href: string) => {
     onOpenChange(false);
@@ -101,16 +100,6 @@ export function CommandPalette({ open, onOpenChange, onToggleRail }: { open: boo
                   </Item>
                   <Item icon={<MessagesSquare />} onSelect={() => go("/app/playground")}>
                     Talk to an agent
-                  </Item>
-                  <Item
-                    icon={<PanelLeft />}
-                    onSelect={() => {
-                      onOpenChange(false);
-                      onToggleRail();
-                    }}
-                    hint="⌘B"
-                  >
-                    Toggle sidebar
                   </Item>
                 </Command.Group>
                 <Command.Group heading="Go to">

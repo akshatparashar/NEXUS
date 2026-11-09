@@ -5,13 +5,13 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import delete, update
+from sqlalchemy import delete, select, update
 
 from app.core.logging import get_logger
 from app.database.session import session_scope
 from app.events.emitter import emit_workspace_event
 from app.events.envelope import DOCUMENT_STATUS
-from app.events.outbox import nudge
+from app.events.outbox import flush
 from app.models import Chunk, Document
 from app.rag.chunking import chunk_pages
 from app.rag.embeddings import get_embedder
@@ -35,7 +35,7 @@ async def _status(doc_id: uuid.UUID, workspace_id: uuid.UUID, filename: str, **v
                 **{k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in values.items()},
             },
         )
-    nudge()
+    await flush()
 
 
 async def ingest_document(doc_id: uuid.UUID) -> None:
@@ -47,10 +47,11 @@ async def ingest_document(doc_id: uuid.UUID) -> None:
         if doc.status == "ready":
             return
         ws, name, path, mime = doc.workspace_id, doc.filename, doc.storage_path, doc.mime
+        stored = await s.scalar(select(Document.content).where(Document.id == doc_id)) if path.startswith("db://") else None
 
     try:
         await _status(doc_id, ws, name, status="parsing", progress=5, error=None)
-        data = await asyncio.to_thread(Path(path).read_bytes)
+        data = stored if stored is not None else await asyncio.to_thread(Path(path).read_bytes)
         pages = await asyncio.to_thread(parse, data, mime)
         chunks = await asyncio.to_thread(chunk_pages, pages)
         await _status(doc_id, ws, name, status="embedding", progress=15, pages=len(pages) if mime == "application/pdf" else None)

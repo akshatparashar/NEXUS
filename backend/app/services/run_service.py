@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,10 +8,11 @@ from sqlalchemy.orm import selectinload
 from app.agents.llm import LLMNotConfigured
 from app.core.config import get_settings
 from app.core.errors import Conflict, NotFound, ValidationFailed
+from app.database.session import session_scope
 from app.events import envelope as ev
 from app.events.emitter import RunEmitter
 from app.events.envelope import EventEnvelope
-from app.events.outbox import enqueue, nudge
+from app.events.outbox import enqueue, flush
 from app.models import Approval, RunArtifact, User, Workflow, WorkflowRun, Workspace
 from app.orchestration.spec import GraphInvalid, parse_graph
 
@@ -54,7 +55,7 @@ async def create_run(session: AsyncSession, ws: Workspace, user: User, workflow:
     # Same transaction: the run row and its command commit together or not at all.
     enqueue(session, ev.COMMANDS, EventEnvelope(type=ev.RUN_REQUESTED, workspace_id=ws.id, run_id=run.id, payload={"mode": "start"}))
     await session.commit()
-    nudge()
+    await flush()
     return run
 
 
@@ -64,7 +65,7 @@ async def cancel_run(session: AsyncSession, ws: Workspace, run_id: uuid.UUID) ->
         raise Conflict("Only queued, running or waiting runs can be cancelled.")
     enqueue(session, ev.COMMANDS, EventEnvelope(type=ev.RUN_CANCEL, workspace_id=ws.id, run_id=run.id))
     await session.commit()
-    nudge()
+    await flush()
     return run
 
 
@@ -79,7 +80,7 @@ async def retry_run(session: AsyncSession, ws: Workspace, run_id: uuid.UUID) -> 
     run.worker_id = None
     enqueue(session, ev.COMMANDS, EventEnvelope(type=ev.RUN_REQUESTED, workspace_id=ws.id, run_id=run.id, payload={"mode": "retry"}))
     await session.commit()
-    nudge()
+    await flush()
     return run
 
 
@@ -144,3 +145,26 @@ async def run_extras(session: AsyncSession, run_id: uuid.UUID) -> tuple[list[App
         await session.execute(select(RunArtifact).where(RunArtifact.run_id == run_id).order_by(RunArtifact.created_at))
     ).scalars().all()
     return list(approvals), list(artifacts)
+
+
+async def kick_if_stale(run_id: uuid.UUID) -> bool:
+    """Serverless only: queue a run again when nothing is working on it.
+
+    Long-running workers have a recovery loop for this. Serverless hosts have none, so it runs
+    when someone opens the run: a queued run whose command was lost, or a running run whose
+    heartbeat stopped (its function timed out or crashed), gets a ``recover`` command. The run
+    lease and the checkpoints make a duplicate harmless.
+    """
+    s = get_settings()
+    stale = datetime.now(UTC) - timedelta(seconds=s.lease_stale_seconds)
+    async with session_scope() as session:
+        run = await session.get(WorkflowRun, run_id, with_for_update=True)
+        if run is None or run.status not in ("queued", "running"):
+            return False
+        last_sign = run.heartbeat_at or run.queued_at
+        if last_sign and last_sign > stale:
+            return False
+        run.heartbeat_at = datetime.now(UTC)  # one kick per stale window
+        enqueue(session, ev.COMMANDS, EventEnvelope(type=ev.RUN_REQUESTED, workspace_id=run.workspace_id, run_id=run.id, payload={"mode": "recover"}))
+    await flush()
+    return True
