@@ -312,7 +312,7 @@ function Message({ m }: { m: Msg }) {
             {m.tool.status === "done" && <ChevronDown className={clsx("size-3 transition-transform", openTool && "rotate-180")} />}
           </button>
           {openTool && m.tool.results && (
-            <ol className="mt-2 flex flex-col gap-1.5 rounded-[10px] bg-surface p-3">
+            <ol className="panel mt-2 flex flex-col gap-1.5 rounded-[12px] p-3">
               {m.tool.results.map((h) => (
                 <li key={h.chunk_id} className="text-[12px] leading-[18px]">
                   <span className="num mr-1.5 rounded-[4px] bg-raised px-1 text-muted">{h.n}</span>

@@ -283,8 +283,8 @@ function Throughput({ rows }: { rows: Pipeline["throughput"] }) {
         labels={labels}
         series={{ lifecycle, commands }}
         segments={[
-          { key: "lifecycle", label: "nexus.lifecycle", color: "var(--accent)" },
-          { key: "commands", label: "nexus.commands", color: "#9fa3ab" },
+          { key: "lifecycle", label: "nexus.lifecycle", color: "var(--agent-analyst)" },
+          { key: "commands", label: "nexus.commands", color: "var(--agent-reviewer)" },
         ]}
         height={180}
       />
@@ -325,7 +325,7 @@ function EventStream() {
       ) : (
         <div className="max-h-[440px] overflow-y-auto">
           <table className="w-full text-[13px]">
-            <thead className="sticky top-0 bg-surface">
+            <thead className="glass-bar sticky top-0">
               <tr className="text-left text-[12px] text-muted">
                 <th className="h-8 w-20 font-normal">Time</th>
                 <th className="font-normal">Type</th>

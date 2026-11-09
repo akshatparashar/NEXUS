@@ -19,7 +19,7 @@ const base =
 
 const variants: Record<Variant, string> = {
   // the primary is inverted (white pill, near-black label), per the dark style
-  primary: "bg-[#f5f5f7] text-[#0b0b0d] hover:bg-white hover:shadow-[0_0_0_4px_rgb(255_255_255_/_0.08)]",
+  primary: "spectrum-ring bg-[#f5f5f7] text-[#0b0b0d] hover:bg-white hover:shadow-[0_8px_30px_rgb(139_133_255_/_0.35)]",
   // the one colourful action: the agent spectrum
   accent: "spectrum-fill text-[#0b0b0d] font-semibold hover:brightness-110 hover:shadow-[0_8px_28px_rgb(139_133_255_/_0.35)]",
   secondary: "bg-white/[0.07] text-text hover:bg-white/[0.12]",

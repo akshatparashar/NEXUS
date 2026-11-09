@@ -72,18 +72,19 @@ export default function OverviewPage() {
 
       {firstRun && <GettingStarted documents={o.documents.ready} onRun={() => setRunOpen(true)} />}
 
-      {/* KPI strip: one container split by hairlines */}
-      <section aria-label="Key figures" className="mb-6 grid grid-cols-2 overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)] sm:grid-cols-3 xl:grid-cols-6">
-        <Kpi label="Runs · 14 days" value={o ? fmtInt(o.runs) : null} sub={o ? `${fmtInt(o.active)} active` : null} />
+      {/* key figures: six glass tiles, each lit by one colour of the team */}
+      <section aria-label="Key figures" className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <Kpi hue="var(--agent-research)" label="Runs · 14 days" value={o ? fmtInt(o.runs) : null} sub={o ? `${fmtInt(o.active)} active` : null} />
         <Kpi
+          hue="var(--positive)"
           label="Success rate"
           value={o ? fmtPct(o.success_rate) : null}
           sub={o ? (o.failed ? <span className="text-[var(--pill-negative-ink)]">{fmtInt(o.failed)} failed</span> : "0 failed") : null}
         />
-        <Kpi label="Median duration" value={o ? fmtDuration(o.p50_ms) : null} sub="succeeded runs" />
-        <Kpi label="p95 duration" value={o ? fmtDuration(o.p95_ms) : null} sub="succeeded runs" />
-        <Kpi label="Tokens used" value={o ? fmtCompact(o.tokens_in + o.tokens_out) : null} sub={o ? `${fmtCompact(o.tokens_in)} in · ${fmtCompact(o.tokens_out)} out` : null} />
-        <Kpi label="Knowledge" value={o ? fmtInt(o.documents.ready) : null} sub={o ? `${fmtInt(o.documents.chunks)} chunks indexed` : null} />
+        <Kpi hue="var(--agent-analyst)" label="Median duration" value={o ? fmtDuration(o.p50_ms) : null} sub="succeeded runs" />
+        <Kpi hue="var(--agent-execution)" label="p95 duration" value={o ? fmtDuration(o.p95_ms) : null} sub="succeeded runs" />
+        <Kpi hue="var(--agent-reviewer)" label="Tokens used" value={o ? fmtCompact(o.tokens_in + o.tokens_out) : null} sub={o ? `${fmtCompact(o.tokens_in)} in · ${fmtCompact(o.tokens_out)} out` : null} />
+        <Kpi hue="var(--agent-research)" label="Knowledge" value={o ? fmtInt(o.documents.ready) : null} sub={o ? `${fmtInt(o.documents.chunks)} chunks indexed` : null} />
       </section>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -101,7 +102,7 @@ export default function OverviewPage() {
               labels={o.daily.map((d) => new Date(d.day).toLocaleDateString("en-GB", { day: "numeric", month: "short" }))}
               series={{ succeeded: o.daily.map((d) => d.succeeded), failed: o.daily.map((d) => d.failed), other: o.daily.map((d) => d.other) }}
               segments={[
-                { key: "succeeded", label: "Succeeded", color: "var(--accent)" },
+                { key: "succeeded", label: "Succeeded", color: "var(--agent-research)" },
                 { key: "failed", label: "Failed", color: "var(--negative)" },
                 { key: "other", label: "Other", color: "#55555c" },
               ]}
@@ -120,12 +121,16 @@ export default function OverviewPage() {
   );
 }
 
-function Kpi({ label, value, sub }: { label: string; value: string | null; sub?: React.ReactNode }) {
+function Kpi({ label, value, sub, hue }: { label: string; value: string | null; sub?: React.ReactNode; hue: string }) {
   return (
-    <div className="border-b border-r border-rule px-5 py-4 last:border-r-0 xl:border-b-0">
-      <p className="text-[12px] text-muted">{label}</p>
-      {value == null ? <Skeleton className="mt-1.5 h-6 w-16" /> : <p className="num mt-1 text-[20px] leading-7 text-text">{value}</p>}
-      {sub != null && <p className="mt-0.5 truncate text-[12px] text-muted">{sub}</p>}
+    <div className="panel panel-hover relative overflow-hidden rounded-[var(--radius-card)] px-5 py-4">
+      <span aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-24 rounded-full opacity-45 blur-[28px]" style={{ background: hue }} />
+      <p className="relative flex items-center gap-2 text-[12px] text-muted">
+        <span className="size-2 rounded-full" style={{ background: hue, boxShadow: `0 0 10px ${hue}` }} />
+        {label}
+      </p>
+      {value == null ? <Skeleton className="mt-1.5 h-6 w-16" /> : <p className="num relative mt-1.5 text-[24px] leading-8 text-text">{value}</p>}
+      {sub != null && <p className="relative mt-0.5 truncate text-[12px] text-muted">{sub}</p>}
     </div>
   );
 }
@@ -134,10 +139,10 @@ function Legend() {
   return (
     <div className="flex items-center gap-3 text-[12px] text-muted">
       <span className="flex items-center gap-1.5">
-        <span className="size-2 bg-accent" /> Succeeded
+        <span className="size-2 rounded-full bg-research" /> Succeeded
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="size-2 bg-negative" /> Failed
+        <span className="size-2 rounded-full bg-negative" /> Failed
       </span>
     </div>
   );
@@ -328,7 +333,7 @@ function WorkflowTable({ workflows, loading, error }: { workflows?: WorkflowSumm
           View all
         </Link>
       </div>
-      <div className="overflow-x-auto rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)]">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] panel">
         {error ? (
           <div className="p-5">
             <ErrorNote error={error} />
@@ -398,7 +403,7 @@ function GettingStarted({ documents, onRun }: { documents: number; onRun: () => 
   ];
   const pct = steps.filter((s) => s.done).length / steps.length;
   return (
-    <section aria-label="Getting started" className="mb-6 rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--card-shadow)]">
+    <section aria-label="Getting started" className="panel mb-6 rounded-[var(--radius-card)] p-5">
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-[14px] font-semibold">Get your first run going</h2>
         <span className="num text-[12px] text-muted">{Math.round(pct * 100)}% done</span>

@@ -102,7 +102,10 @@ function WorkflowsInner() {
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {data?.map((w) => (
-            <article key={w.id} className="group relative flex flex-col rounded-[var(--radius-card)] bg-surface p-5 shadow-[var(--card-shadow)] transition-colors hover:bg-[#16151a]">
+            <article key={w.id} className="panel panel-hover group relative flex flex-col overflow-hidden rounded-[var(--radius-panel)] p-5">
+              {/* the card is lit by this workflow's own agents, in their order */}
+              <span aria-hidden className="absolute inset-x-0 top-0 h-[3px]" style={{ background: agentGradient(w.agent_types) }} />
+              <span aria-hidden className="pointer-events-none absolute -right-10 -top-16 h-36 w-56 rounded-full opacity-30 blur-[50px]" style={{ background: agentGradient(w.agent_types) }} />
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/app/workflows/${w.id}`} className="min-w-0 after:absolute after:inset-0">
                   <h2 className="truncate text-[16px] font-semibold leading-6">{w.name}</h2>
@@ -134,7 +137,7 @@ function WorkflowsInner() {
               <div className="mt-4">
                 <AgentStack types={w.agent_types} size={22} />
               </div>
-              <div className="mt-5 flex items-center justify-between gap-3 border-t border-rule pt-3">
+              <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/[0.07] pt-3">
                 <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted">
                   {w.last_run_status ? <StatusPill status={w.last_run_status} /> : <span>Never run</span>}
                   <span className="num truncate">
@@ -169,4 +172,10 @@ function WorkflowsInner() {
       </Dialog>
     </div>
   );
+}
+
+function agentGradient(types: string[]): string {
+  const hues = Array.from(new Set(types)).map((t) => `var(--agent-${t})`);
+  if (hues.length === 0) return "var(--spectrum)";
+  return hues.length === 1 ? hues[0] : `linear-gradient(90deg, ${hues.join(", ")})`;
 }

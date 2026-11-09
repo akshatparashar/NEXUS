@@ -124,17 +124,19 @@ function Knowledge() {
           <div
             className={clsx(
               "mb-4 flex items-center gap-4 rounded-[var(--radius-card)] border border-dashed px-5 py-4 transition-colors",
-              dragging ? "border-accent bg-[var(--pill-accent-bg)]" : "border-control",
+              dragging
+                ? "border-research bg-[color-mix(in_oklab,var(--agent-research)_14%,transparent)]"
+                : "border-[color-mix(in_oklab,var(--agent-research)_35%,transparent)] bg-[color-mix(in_oklab,var(--agent-research)_5%,transparent)]",
             )}
           >
-            <UploadCloud className={clsx("size-5 flex-none", dragging ? "text-accent-ink" : "text-muted")} />
+            <UploadCloud className="size-5 flex-none text-research" />
             <p className="flex-1 text-[13px] leading-5 text-muted">
               <span className="text-text">Drop PDF, TXT or Markdown files anywhere on this page.</span> Up to {MAX_MB} MB each. Files are parsed, chunked
               and embedded in the background.
             </p>
           </div>
           {uploads.map((u) => (
-            <div key={u.name} className="mb-2 rounded-[var(--radius-card)] bg-surface px-4 py-3">
+            <div key={u.name} className="panel mb-2 rounded-[var(--radius-card)] px-4 py-3">
               <div className="mb-2 flex items-center justify-between text-[13px]">
                 <span className="truncate">{u.name}</span>
                 <span className="num text-muted">{u.progress}% uploaded</span>
@@ -217,8 +219,10 @@ function DocRow({ doc, onOpen, onDelete }: { doc: DocumentRow; onOpen: () => voi
   const qc = useQueryClient();
   const processing = !["ready", "failed"].includes(doc.status);
   return (
-    <li className="group flex items-center gap-4 rounded-[var(--radius-card)] bg-surface px-4 py-3 shadow-[var(--card-shadow)]">
-      <FileText className="size-5 flex-none text-muted" strokeWidth={1.5} />
+    <li className="panel panel-hover group flex items-center gap-4 rounded-[var(--radius-card)] px-4 py-3">
+      <span className="flex size-10 flex-none items-center justify-center rounded-[12px] bg-[color-mix(in_oklab,var(--agent-research)_16%,transparent)] text-research">
+        <FileText className="size-5" strokeWidth={1.6} />
+      </span>
       <button onClick={onOpen} disabled={doc.status !== "ready"} className="min-w-0 flex-1 text-left disabled:cursor-default">
         <p className="truncate text-[13px] font-medium group-hover:text-accent-ink">{doc.filename}</p>
         {processing ? (

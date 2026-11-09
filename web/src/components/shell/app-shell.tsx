@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Mark } from "@/components/brand";
 import { Dock, type DockItem } from "@/components/dock/dock";
+import { Aurora } from "@/components/landing/motion";
 import { get, refreshSession } from "@/lib/api";
 import { useActivityStream } from "@/lib/activity";
 import { useSession } from "@/lib/session";
@@ -44,7 +45,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (status !== "authed") return <BootScreen />;
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    // isolate: the ambient light (z -10) must paint inside this shell, not under <body>'s background
+    <div className="relative isolate flex min-h-dvh flex-col">
+      <div className="app-ambient" aria-hidden>
+        <Aurora intensity={1} />
+      </div>
       <TopBar onOpenPalette={() => palette.setOpen(true)} />
       <main className="min-w-0 flex-1 pb-[var(--dock-space)]">{children}</main>
       <AppDock onOpenPalette={() => palette.setOpen(true)} />

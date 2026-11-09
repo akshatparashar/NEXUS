@@ -230,7 +230,7 @@ function StepList({
 }) {
   if (steps.length === 0) {
     return (
-      <div className="rounded-[var(--radius-card)] bg-surface p-5 text-[13px] text-muted shadow-[var(--card-shadow)]">
+      <div className="panel rounded-[var(--radius-card)] p-5 text-[13px] text-muted">
         {status === "queued" ? (
           <span className="flex items-center gap-2">
             <span className="thinking-dot" /> Waiting for a worker to pick up the run…
@@ -254,7 +254,7 @@ function StepItem({ step, stream, open, onToggle, sources }: { step: Step; strea
   const o = step.output ?? {};
   const running = step.status === "running";
   return (
-    <li id={`step-${step.id}`} className={clsx("scroll-mt-24 rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)]", open && "ring-1 ring-inset ring-white/[0.04]")}>
+    <li id={`step-${step.id}`} className={clsx("scroll-mt-24 rounded-[var(--radius-card)] panel", open && "ring-1 ring-inset ring-white/[0.04]")}>
       <button onClick={onToggle} className="flex w-full items-center gap-3 px-4 py-3 text-left" aria-expanded={open}>
         <AgentTile type={step.agent_type} size={26} />
         <div className="min-w-0 flex-1">
@@ -495,7 +495,7 @@ function EventLog({ events }: { events: LifecycleEvent[] }) {
   const rows = useMemo(() => [...events].reverse(), [events]);
   if (!rows.length) return <p className="text-[13px] text-muted">No events yet.</p>;
   return (
-    <div className="overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)]">
+    <div className="overflow-hidden rounded-[var(--radius-card)] panel">
       <table className="w-full text-[13px]">
         <thead>
           <tr className="text-left text-[12px] text-muted">

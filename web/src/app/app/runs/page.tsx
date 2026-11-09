@@ -82,7 +82,7 @@ export default function RunsPage() {
       ) : (
         <>
           {/* desktop table */}
-          <div className="hidden overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--card-shadow)] md:block">
+          <div className="hidden overflow-hidden rounded-[var(--radius-card)] panel md:block">
             <table className="w-full table-fixed text-[13px]">
               <thead>
                 <tr className="text-left text-[12px] text-muted">
@@ -120,7 +120,7 @@ export default function RunsPage() {
           <ul className="flex flex-col gap-2 md:hidden">
             {rows.map((r) => (
               <li key={r.id}>
-                <Link href={`/app/runs/${r.id}`} className="block rounded-[var(--radius-card)] bg-surface px-4 py-3">
+                <Link href={`/app/runs/${r.id}`} className="panel block rounded-[var(--radius-card)] px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate text-[14px] font-medium">{r.workflow_name}</span>
                     <StatusPill status={r.status} />

@@ -72,7 +72,7 @@ function Row({ title, desc, children }: { title: string; desc: string; children:
         <h2 className="text-[16px] font-medium">{title}</h2>
         <p className="mt-1 text-[13px] leading-5 text-muted">{desc}</p>
       </div>
-      <div className="rounded-[var(--radius-card)] bg-surface px-5 py-3 shadow-[var(--card-shadow)]">{children}</div>
+      <div className="panel rounded-[var(--radius-card)] px-5 py-3">{children}</div>
     </section>
   );
 }

@@ -23,3 +23,7 @@ web/next-env.d.ts
 # deploy
 .vercel/
 web/tsconfig.tsbuildinfo
+
+# local credential files (deploy settings); keep the template
+.env.*
+!.env.example

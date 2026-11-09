@@ -2,7 +2,8 @@
 
 import { clsx } from "clsx";
 import { AnimatePresence, motion } from "motion/react";
-import { RotateCw, X } from "lucide-react";
+import { Activity, BookOpen, Gauge, LayoutGrid, type LucideIcon, MessagesSquare, RotateCw, Settings2, Workflow as WorkflowIcon, X } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { forwardRef, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/hooks";
@@ -25,7 +26,7 @@ export function Card({
   bodyClassName?: string;
 }) {
   return (
-    <section className={clsx("flex min-w-0 flex-col rounded-[var(--radius-card)] bg-surface shadow-[inset_0_1px_0_rgb(255_255_255_/_0.05),0_0_0_1px_rgb(255_255_255_/_0.04)]", className)}>
+    <section className={clsx("panel flex min-w-0 flex-col rounded-[var(--radius-card)]", className)}>
       {(title || action) && (
         <header className="flex min-h-[52px] items-center justify-between gap-3 px-5 pt-4 pb-2">
           <div className="min-w-0">
@@ -72,7 +73,7 @@ export function Tabs<T extends string>({
             {it.count != null && <span className="num text-[11px] text-muted">{it.count}</span>}
             <span
               className={clsx(
-                "absolute inset-x-0 bottom-0 h-px origin-center bg-accent transition-transform duration-200 ease-[var(--ease)]",
+                "spectrum-fill absolute inset-x-0 bottom-0 h-[2px] origin-center rounded-full transition-transform duration-200 ease-[var(--ease)]",
                 on ? "scale-x-100" : "scale-x-0",
               )}
             />
@@ -393,12 +394,45 @@ export function Tip({ label, children, side = "right" }: { label: string; childr
 
 /* ── Page title row ──────────────────────────────────────────────────────────────── */
 
+/** Each section of the app owns a colour from the agent spectrum; its header is lit with it. */
+const PAGE_LOOK: { match: (p: string) => boolean; hue: string | "spectrum"; icon: LucideIcon }[] = [
+  { match: (p) => p === "/app", hue: "spectrum", icon: LayoutGrid },
+  { match: (p) => p.startsWith("/app/workflows"), hue: "var(--agent-analyst)", icon: WorkflowIcon },
+  { match: (p) => p.startsWith("/app/runs"), hue: "var(--agent-execution)", icon: Activity },
+  { match: (p) => p.startsWith("/app/playground"), hue: "var(--thinking)", icon: MessagesSquare },
+  { match: (p) => p.startsWith("/app/knowledge"), hue: "var(--agent-research)", icon: BookOpen },
+  { match: (p) => p.startsWith("/app/monitoring"), hue: "var(--agent-reviewer)", icon: Gauge },
+  { match: (p) => p.startsWith("/app/settings"), hue: "#c9c9cf", icon: Settings2 },
+];
+
 export function PageHeader({ title, sub, actions }: { title: React.ReactNode; sub?: React.ReactNode; actions?: React.ReactNode }) {
+  const pathname = usePathname() ?? "";
+  const look = PAGE_LOOK.find((l) => l.match(pathname));
+  const Icon = look?.icon;
+  const spectrum = look?.hue === "spectrum";
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.03em] md:text-[34px] md:leading-10">{title}</h1>
-        {sub && <p className="mt-1.5 max-w-[80ch] text-[15px] leading-6 text-muted">{sub}</p>}
+    <div className="relative mb-8 flex flex-wrap items-end justify-between gap-4">
+      {look && (
+        <span
+          aria-hidden
+          className={clsx("pointer-events-none absolute -left-16 -top-24 -z-10 h-56 w-[28rem] rounded-full opacity-50 blur-[80px]", spectrum && "spectrum-fill")}
+          style={spectrum ? undefined : { background: look.hue }}
+        />
+      )}
+      <div className="flex min-w-0 items-center gap-4">
+        {Icon && (
+          <span
+            aria-hidden
+            className={clsx("flex size-12 flex-none items-center justify-center rounded-[16px] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.25)]", spectrum && "spectrum-fill text-[#0b0b0d]")}
+            style={spectrum ? undefined : { background: `color-mix(in oklab, ${look!.hue} 22%, rgb(255 255 255 / 0.04))`, color: look!.hue }}
+          >
+            <Icon className="size-[22px]" strokeWidth={1.9} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.03em] md:text-[34px] md:leading-10">{title}</h1>
+          {sub && <p className="mt-1 max-w-[80ch] text-[15px] leading-6 text-muted">{sub}</p>}
+        </div>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
