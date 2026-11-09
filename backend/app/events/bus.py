@@ -209,9 +209,10 @@ class KafkaBus(MessageBus):
 class ServerlessBus(MessageBus):
     """No long-lived consumers exist on serverless hosts, so each topic is delivered directly.
 
-    * ``nexus.commands`` → a Vercel Queues topic. Its consumer (``app.workers.vercel_queue``)
-      runs the command to completion in its own function invocation, with the queue's retries.
-      ``COMMAND_QUEUE=inline`` runs the command in this process instead (local testing).
+    * ``nexus.commands`` → ``COMMAND_QUEUE=inline`` (default on Vercel): the command runs in the
+      function that received the request, kept alive by Vercel's ``wait_until`` until it finishes
+      (bounded by the function's maxDuration). ``COMMAND_QUEUE=vercel`` sends it to a Vercel Queues
+      topic consumed by ``app.workers.vercel_queue`` instead.
     * ``nexus.lifecycle`` → the projector, right here. It is idempotent, so a re-publish of the
       same outbox row is harmless.
     * ``nexus.dlq`` → only logged; dead letters are already stored in the database.
@@ -247,6 +248,7 @@ class ServerlessBus(MessageBus):
             task = asyncio.create_task(handle_command(value))
             self._inline_tasks.add(task)
             task.add_done_callback(self._inline_tasks.discard)
+            _keep_alive(task)
             return
         from vercel.queue import send
 
@@ -260,6 +262,20 @@ class ServerlessBus(MessageBus):
         """Test helper: wait for commands running inline."""
         while self._inline_tasks:
             await asyncio.gather(*list(self._inline_tasks), return_exceptions=True)
+
+
+def _keep_alive(task: asyncio.Task) -> None:
+    """On Vercel, keep this function invocation running until the command finishes."""
+    import os
+
+    if not os.environ.get("VERCEL"):
+        return
+    try:
+        from vercel.functions import wait_until
+
+        wait_until(task)
+    except Exception:  # outside a request context: the task still runs while the instance lives
+        log.warning("wait_until_unavailable")
 
 
 _bus: MessageBus | None = None

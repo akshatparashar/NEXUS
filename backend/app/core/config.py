@@ -24,9 +24,9 @@ class Settings(BaseSettings):
     # commands go to a queue whose consumer runs each run to completion, and lifecycle events
     # are projected in the process that produced them.
     run_mode: Literal["embedded", "api", "worker", "projector", "serverless"] = "embedded"
-    # serverless only: "vercel" sends commands to Vercel Queues; "inline" runs them in-process
-    # (local testing of the serverless code path without Vercel)
-    command_queue: Literal["vercel", "inline"] = "vercel"
+    # serverless only: "inline" runs each command in the function that received the request (kept
+    # alive with Vercel's wait_until); "vercel" sends it to Vercel Queues for a separate consumer
+    command_queue: Literal["vercel", "inline"] = "inline"
     queue_topic: str = "nexus-commands"
 
     database_url: str = "postgresql+asyncpg://nexus:nexus@localhost:5432/nexus"

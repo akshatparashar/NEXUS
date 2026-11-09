@@ -4,7 +4,7 @@ Two supported ways:
 
 | | What runs where | Cost |
 |---|---|---|
-| **Vercel** (this guide) | One Vercel project: the Next.js app and the FastAPI API as two *services*; Vercel Queues runs the agents; Postgres on **Neon**; Redis on **Upstash** | Free tiers |
+| **Vercel** (this guide) | One Vercel project: the Next.js app and the FastAPI API as two *services*; Postgres on **Neon**; Redis on **Upstash** | Free tiers |
 | **Docker Compose** | Everything on one machine or VM (`docker compose up --build`, see README) | Your server |
 
 > Status: the Vercel setup below is written and the serverless code path is covered by
@@ -20,14 +20,17 @@ browser ──► vercel.app ──┬─ /api/*, /docs ─► service "api"  (F
                          └─ everything else ► service "web"  (Next.js)
 
 POST /runs ─► run row + command written in one transaction (outbox)
-           └► the same request publishes the command to Vercel Queues
-Vercel Queues ─► app.workers.vercel_queue (private function) runs the LangGraph run to the end
-               ├► lifecycle events → projector, inline → Postgres (event log + run views)
-               └► streamed tokens → Upstash Redis pub/sub → SSE in the API service
+           └► the same request publishes the command and runs it in that function,
+              kept alive after the response by Vercel's wait_until (up to maxDuration)
+              ├► lifecycle events → projector, inline → Postgres (event log + run views)
+              └► streamed tokens → Upstash Redis pub/sub → SSE in any API instance
 ```
 
-- **No background processes.** Each request flushes its own outbox rows; the queue consumer runs each
-  command to completion; a run whose function died is re-queued the next time someone opens it.
+- **No background processes.** Each request flushes its own outbox rows and runs the commands it
+  produced (`COMMAND_QUEUE=inline`, the default); a run whose function died is re-queued the next time
+  someone opens it. `COMMAND_QUEUE=vercel` hands commands to Vercel Queues instead, but note that a
+  `[[tool.vercel.subscribers]]` consumer was not generated inside a Services-framework FastAPI service
+  when this was first deployed, so inline is the tested path.
 - **Durable.** Runs checkpoint to Postgres after every step, so a re-queued run resumes, it does not restart.
 - **Approvals** pause the run and end the function; the decision queues a `resume` command.
 - **Cancelling** a run marks it cancelled; the instance running it notices within 5 seconds and stops.
@@ -93,8 +96,8 @@ the event log), but text no longer streams word by word.
 
 - `vercel.json`: services `web` (`web/`, Next.js) and `api` (`backend/`, FastAPI via `backend/main.py`),
   with `/api/*`, `/docs` and `/openapi.json` routed to the API. The API function gets `maxDuration: 300`.
-- `backend/pyproject.toml` → `[[tool.vercel.subscribers]]` turns `app/workers/vercel_queue.py` into the
-  private queue consumer of the `nexus-commands` topic (Vercel Queues is in beta on all plans).
+- `backend/pyproject.toml` → `[[tool.vercel.subscribers]]` declares `app/workers/vercel_queue.py` as a
+  queue consumer, used only with `COMMAND_QUEUE=vercel`.
 
 ## Limits to know
 
