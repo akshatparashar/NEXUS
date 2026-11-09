@@ -55,6 +55,25 @@ class OpenAIEmbedder(Embedder):
         return await self._client.aembed_documents(texts)
 
 
+class GoogleEmbedder(Embedder):
+    """Gemini embeddings at the database's dimension (gemini-embedding-001 supports any size).
+
+    Uses the Gemini key, so it needs no model download: the right choice on serverless hosts.
+    """
+
+    def __init__(self, dim: int) -> None:
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+        self.dim = dim
+        self._client = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=get_settings().google_api_key)
+
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return await self._client.aembed_documents(texts, task_type="RETRIEVAL_DOCUMENT", output_dimensionality=self.dim)
+
+    async def embed_query(self, text: str) -> list[float]:
+        return (await self._client.aembed_documents([text], task_type="RETRIEVAL_QUERY", output_dimensionality=self.dim))[0]
+
+
 _override: Embedder | None = None
 
 
@@ -67,6 +86,10 @@ def set_embedder(e: Embedder | None) -> None:
 @lru_cache
 def _default() -> Embedder:
     s = get_settings()
+    if s.embedding_provider == "google":
+        if not s.google_api_key:
+            raise ServiceUnavailable("EMBEDDING_PROVIDER=google needs GOOGLE_API_KEY.", code="embeddings_unconfigured")
+        return GoogleEmbedder(s.embedding_dim)
     if s.embedding_provider == "openai":
         if not s.openai_api_key:
             raise ServiceUnavailable("EMBEDDING_PROVIDER=openai needs OPENAI_API_KEY.", code="embeddings_unconfigured")

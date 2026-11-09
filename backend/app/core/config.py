@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
 
     # Embeddings: "local" runs BAAI/bge-small-en-v1.5 on CPU through fastembed and needs no key.
-    embedding_provider: Literal["local", "openai"] = "local"
+    embedding_provider: Literal["local", "openai", "google"] = "local"
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_dim: int = 384
     model_cache_dir: str = ".models"

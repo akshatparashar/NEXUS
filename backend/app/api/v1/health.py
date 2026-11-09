@@ -51,7 +51,7 @@ async def config_status() -> dict:
         "command_queue": s.command_queue if s.serverless else None,
         "commit": (os.environ.get("VERCEL_GIT_COMMIT_SHA") or "")[:7] or None,
         "llm": llm,
-        "embeddings": {"provider": s.embedding_provider, "model": s.embedding_model if s.embedding_provider == "local" else "text-embedding-3-small", "dim": s.embedding_dim},
+        "embeddings": {"provider": s.embedding_provider, "model": {"local": s.embedding_model, "openai": "text-embedding-3-small", "google": "gemini-embedding-001"}[s.embedding_provider], "dim": s.embedding_dim},
         "database": await _db(),
         "event_bus": {"kind": get_bus().name, "ok": await get_bus().healthy(), "bootstrap": s.kafka_bootstrap_servers if s.event_bus == "kafka" else None},
         "realtime": {"kind": "redis" if isinstance(ps, RedisPubSub) else "memory", "ok": await ps.healthy()},
