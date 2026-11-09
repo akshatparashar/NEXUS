@@ -9,7 +9,7 @@
 NEXUS turns a graph you draw on a canvas into a team of AI agents that research your documents,<br/>
 analyse what they find, act on it with your approval, and review their own work, live, step by step.
 
-**[Live demo](https://nexus-three-steel-20.vercel.app)** · [Deploy your own](DEPLOY.md) · [Architecture](docs/architecture.md) · [API docs](https://nexus-three-steel-20.vercel.app/docs)
+**[Live demo](https://nexus-ai-worker.vercel.app)** · [Deploy your own](DEPLOY.md) · [Architecture](docs/architecture.md) · [API docs](https://nexus-ai-worker.vercel.app/docs)
 
 ![Next.js](https://img.shields.io/badge/Next.js_16-000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-20232a?logo=react&logoColor=61dafb)
