@@ -1,3 +1,4 @@
+import os
 import time
 
 import httpx
@@ -47,6 +48,8 @@ async def config_status() -> dict:
         "app": s.app_name,
         "environment": s.environment,
         "run_mode": s.run_mode,
+        "command_queue": s.command_queue if s.serverless else None,
+        "commit": (os.environ.get("VERCEL_GIT_COMMIT_SHA") or "")[:7] or None,
         "llm": llm,
         "embeddings": {"provider": s.embedding_provider, "model": s.embedding_model if s.embedding_provider == "local" else "text-embedding-3-small", "dim": s.embedding_dim},
         "database": await _db(),

@@ -1,195 +1,220 @@
+<div align="center">
+
+<img src="docs/screenshots/01-landing-hero.png" alt="NEXUS landing page: Draw a team. Watch it work." width="100%" />
+
 # NEXUS AI
 
-**Draw a team of AI agents, connect your documents, and watch them research, analyse, act and review, live.**
+### Draw a team of AI agents. Watch it work.
 
-NEXUS turns a graph of agents drawn on a canvas into a durable, observable, event-driven run:
+NEXUS turns a graph you draw on a canvas into a team of AI agents that research your documents,<br/>
+analyse what they find, act on it with your approval, and review their own work, live, step by step.
 
-- **The canvas is the program.** Nodes and edges in the React Flow builder compile into a LangGraph `StateGraph`. The graph is validated before it runs: no orphan nodes, END is reachable, and every reviewer loop has a revision cap.
-- **Durable.** Runs checkpoint to Postgres. A run survives a worker restart, can be retried from its last checkpoint, and can pause for a person's approval.
-- **Event-driven.** The API never runs agents. It writes a command to a transactional outbox, which goes to Kafka; a worker runs the graph, and lifecycle events come back through Kafka. Consumers are idempotent, retry with backoff, and send poison messages to a DLQ.
-- **Observable.** Every step, token, tool call and retry is streamed over SSE and persisted, so a run can be replayed later.
-- **Grounded.** Agents search the workspace knowledge base (pgvector + full-text, fused with RRF) and cite the chunks they used.
+**[Live demo](https://nexus-three-steel-20.vercel.app)** · [Deploy your own](DEPLOY.md) · [Architecture](docs/architecture.md) · [API docs](https://nexus-three-steel-20.vercel.app/docs)
 
-![The builder during a live run](docs/screenshots/09-builder-live-run.png)
+![Next.js](https://img.shields.io/badge/Next.js_16-000?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React_19-20232a?logo=react&logoColor=61dafb)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-1c3c3c?logo=langchain&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/Postgres_+_pgvector-4169e1?logo=postgresql&logoColor=white)
+![Gemini](https://img.shields.io/badge/Gemini_·_OpenAI_·_Anthropic_·_Ollama-8e75b2?logo=googlegemini&logoColor=white)
+![Vercel](https://img.shields.io/badge/Deploys_on-Vercel-000?logo=vercel&logoColor=white)
 
----
-
-## Contents
-
-- [Architecture](#architecture)
-- [Quick start (Docker Compose)](#quick-start-docker-compose)
-- [Choosing a model provider](#choosing-a-model-provider)
-- [Local development without Docker](#local-development-without-docker)
-- [Tests](#tests)
-- [Screenshots](#screenshots)
-- [Design notes](#design-notes)
-- [Deploying](#deploying)
-- [Project status and honest notes](#project-status-and-honest-notes)
+</div>
 
 ---
 
-## Architecture
+## Why NEXUS
 
-![Architecture](docs/architecture.png)
+Most "AI agent" demos are a chat box. NEXUS is a **workflow you can see**:
 
-One Python package runs as three processes, chosen by `RUN_MODE`:
-
-| Process | Does |
+| | |
 |---|---|
-| `api` | REST + SSE, auth, workspaces. Writes domain rows **and** outbox rows in one transaction; the outbox relay publishes them to Kafka. |
-| `worker` | Consumes `nexus.commands`: compiles and runs workflows on LangGraph (agents, RAG, tools, `interrupt()` approvals) and ingests documents. |
-| `projector` | Consumes `nexus.lifecycle`: appends the numbered event log, updates run/step read models, fans out to Redis pub/sub for SSE. |
-
-`RUN_MODE=embedded` runs all three in one process (handy for development). The full walk-through of a run, the delivery guarantees and a code map are in **[docs/architecture.md](docs/architecture.md)**.
-
-**Stack.** Next.js 16 · TypeScript · Tailwind 4 · React Flow · TanStack Query · motion · cmdk — FastAPI · Pydantic v2 · SQLAlchemy 2 (async) · Alembic · structlog — LangGraph + Postgres checkpointer · LangChain `init_chat_model` — PostgreSQL 16 + pgvector · Kafka (KRaft) via aiokafka · Redis.
+| 🧩 **The canvas is the program** | Drag Research, Analyst, Execution and Reviewer agents onto a canvas and connect them. The graph compiles to a LangGraph state machine and is checked first: no orphans, no endless loops. |
+| 📚 **Grounded in your documents** | Upload PDF, Markdown or text. Agents search them by meaning *and* exact words (pgvector + full text, fused with Reciprocal Rank Fusion) and cite every passage they use as `[1]`, `[2]`. |
+| ✋ **Nothing irreversible without you** | Tools that delete or send are flagged. The run pauses, keeps its state, and continues only after a person approves. |
+| 🔁 **Reviewers push back** | A Reviewer agent scores the work and sends it back with specific feedback, up to a revision limit you set. Loops always end. |
+| 📡 **Live, and replayable** | Every token, tool call and step streams to the browser over Server-Sent Events and is stored, so any run can be replayed later. |
+| 🛟 **Durable** | Each step is checkpointed in Postgres. A run that is interrupted resumes where it was; a failed run retries from its last checkpoint without redoing finished agents. |
 
 ---
 
-## Quick start (Docker Compose)
+## A look inside
 
-Requirements: Docker Desktop (or Docker Engine + Compose v2), about 4 GB free RAM.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/09-builder-live-run.png" alt="The builder during a live run" /><br/><b>Builder.</b> The running agent glows in its own colour while its words stream onto the node.</td>
+    <td width="50%"><img src="docs/screenshots/04-landing-relay.png" alt="Four agents, one relay" /><br/><b>Four agents, one relay.</b> Each agent owns a colour, so you can follow the work as it moves.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/13-overview.png" alt="Overview dashboard" /><br/><b>Overview.</b> Runs, success rate, latency, tokens and a live activity feed.</td>
+    <td><img src="docs/screenshots/11-run-detail.png" alt="Run detail" /><br/><b>Run detail.</b> A step timeline, every output with its citations, and full event replay.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/12-approval.png" alt="Approval" /><br/><b>Human in the loop.</b> A destructive action waits for you, with the file and the reason.</td>
+    <td><img src="docs/screenshots/06-knowledge.png" alt="Knowledge base" /><br/><b>Knowledge.</b> Upload documents and ask questions; answers cite their passages.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/15-monitoring.png" alt="Monitoring" /><br/><b>Monitoring.</b> The event pipeline, consumer lag, throughput and dead letters.</td>
+    <td><img src="docs/screenshots/16-playground.png" alt="Playground" /><br/><b>Playground.</b> Talk to one agent directly and watch its tool calls.</td>
+  </tr>
+</table>
 
-```bash
-cp .env.example .env          # then add OPENAI_API_KEY or ANTHROPIC_API_KEY (or use Ollama, below)
-docker compose up --build
+<sub>Screenshots come from the end-to-end test harness, which uses a deterministic test model instead of a real LLM so the images are reproducible.</sub>
+
+---
+
+## The design
+
+NEXUS has its own visual language, **Spectrum**:
+
+- **Monochrome, with colour that means something.** The interface is black, white and greys. Each agent owns one hue: Research cyan, Analyst indigo, Execution pink, Reviewer amber. Every gradient you see is those four agents handing work to each other. The logo is the letter N drawn as a run through four nodes in those colours.
+- **Glass.** Panels are frosted glass over the team's light. The colour shows through; the text stays crisp.
+- **The dock.** Navigation is a small glass dock at the bottom of every page. Icons magnify under the pointer like the macOS Dock, a spectrum bar slides to where you are, and on a phone it becomes a normal tab bar.
+- **Motion with GSAP.** A split-text headline, a pinned scroll scene where the logo's N draws itself through the four agents, a sideways pipeline, Flip tab highlights. All of it respects `prefers-reduced-motion`, and the page reads fine without JavaScript.
+
+---
+
+## How a run works
+
+```
+ you press Run
+   │
+   ▼
+ FastAPI ──► run row + start command, one database transaction (transactional outbox)
+   │
+   ▼
+ LangGraph ──► Research ──► Analyst ──► Execution ──► Reviewer ─┐
+   │              ▲                        │  (waits for your OK) │
+   │              └──────── revise, up to N times ◄──────────────┘
+   │   every step checkpointed in Postgres
+   ▼
+ lifecycle events ──► projector ──► run views + event log ──► SSE ──► your browser
+ streamed tokens  ──► Redis pub/sub ──────────────────────────► SSE ──► your browser
 ```
 
-| URL | What |
+The same code runs in three topologies, chosen by `RUN_MODE`:
+
+| Where | How work is delivered |
 |---|---|
-| http://localhost:3000 | the app (register an account; a workspace with sample workflows is created for you) |
-| http://localhost:8000/docs | OpenAPI / Swagger |
+| **Vercel** (`serverless`) | No background processes: each request flushes its own outbox, uploads are indexed inside the upload request, and a run executes inside its own live stream. Neon Postgres + Upstash Redis. |
+| **One process** (`embedded`) | API, worker and projector in one process with an in-memory bus. The easiest way to develop. |
+| **Docker Compose** (`api` / `worker` / `projector`) | Separate containers with Kafka between them, idempotent consumers, retries and a dead-letter queue. |
 
-Compose starts Postgres (pgvector), Redis, Kafka (KRaft, single broker), a one-shot `migrate` job, then `api`, `worker`, `projector` and `web`. Kafka topics are created by the backend on start.
+More detail, delivery guarantees and a code map: **[docs/architecture.md](docs/architecture.md)**.
 
-Generate a real `JWT_SECRET` before exposing it anywhere:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
+<img src="docs/architecture.png" alt="Architecture diagram" width="100%" />
 
 ---
 
-## Choosing a model provider
+## Quick start
 
-Set these in `.env`. Embeddings run locally by default (`BAAI/bge-small-en-v1.5`, CPU, ~130 MB download on first use), so the knowledge base works without any key.
+### Run it locally (no Docker)
 
-| Provider | `.env` |
-|---|---|
-| OpenAI (default) | `LLM_PROVIDER=openai` · `LLM_MODEL=gpt-4.1-mini` · `OPENAI_API_KEY=sk-…` (any OpenAI-compatible endpoint via `OPENAI_BASE_URL`) |
-| Anthropic | `LLM_PROVIDER=anthropic` · `LLM_MODEL=claude-sonnet-5-5` · `ANTHROPIC_API_KEY=…` |
-| Google Gemini (free tier works) | `LLM_PROVIDER=google` · `LLM_MODEL=gemini-3.5-flash-lite` · `GOOGLE_API_KEY=…` (from Google AI Studio). A three-agent run uses about 5k tokens. |
-| Ollama (free, local) | `LLM_PROVIDER=ollama` · `LLM_MODEL=qwen2.5:7b`, then `docker compose --profile ollama up --build` and `docker compose exec ollama ollama pull qwen2.5:7b` |
-
-If no provider is usable, the app says so on Settings and on the run dialog instead of faking output. `GET /api/v1/health/config` reports what is configured.
-
-Guards (all in `.env.example`): run timeout, per-node timeout and retries, revision caps, a per-run token budget, max concurrent runs, upload size, the `http_get` host allowlist and the webhook allowlist for the one destructive tool.
-
----
-
-## Local development without Docker
-
-Works on Windows, macOS and Linux. Needs Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 20+.
+Needs Python 3.12 with [uv](https://docs.astral.sh/uv/) and Node 20+. Works on Windows, macOS and Linux.
 
 ```bash
-# 1) Postgres 16 + pgvector, embedded (pgserver). Prints a DATABASE_URL: put it in backend/.env
+# 1) Postgres 16 + pgvector, embedded. Prints a DATABASE_URL: put it in backend/.env
 cd backend
 uv sync
 uv run python scripts/dev_db.py
 
-# 2) API + worker + projector in one process, in-memory event bus
-#    backend/.env needs DATABASE_URL and a model key (see above)
+# 2) a model key in backend/.env (see "Choose a model" below), then the API
 uv run alembic upgrade head
 uv run python scripts/serve.py              # http://127.0.0.1:8000
 
-# 3) web (proxies /api/v1 to :8000)
+# 3) the web app (proxies /api/v1 to :8000)
 cd ../web
 npm install
 npx next dev -p 3000                        # http://127.0.0.1:3000
 ```
 
-Notes:
+Register an account: your workspace starts with three ready workflows. Upload one of the sample documents in [`docs/samples/`](docs/samples) and press Run.
 
-- On Windows always start the API with `scripts/serve.py` (or `python -m app.workers` for worker/projector roles), not the plain `uvicorn` CLI: the async psycopg driver used by the LangGraph checkpointer needs the selector event loop.
-- If `pip` is your only installer: `pip install uv`, then use `python -m uv …`.
-- Without Redis, pub/sub and rate limits fall back to in-process implementations; that is fine for one process.
+> On Windows, start the API with `scripts/serve.py` rather than the plain `uvicorn` CLI: the async Postgres driver used by the LangGraph checkpointer needs the selector event loop.
 
-### With a real Kafka broker, still no Docker
+### Deploy to Vercel (free tiers)
 
-Kafka 3.9 runs on any machine with Java 17+. On Windows the bundled `.bat` scripts fail with "The input line is too long", so call Java directly:
+One Vercel project runs both the Next.js app and the FastAPI API as two services, with Postgres on Neon and Redis on Upstash. Step by step: **[DEPLOY.md](DEPLOY.md)**.
+
+### Docker Compose
 
 ```bash
-# from the extracted kafka_2.13-3.9.1 directory; set log.dirs in config/kraft/server.properties first
-CP='libs/*'
-ID=$(java -cp "$CP" kafka.tools.StorageTool random-uuid)
-java -cp "$CP" kafka.tools.StorageTool format -t "$ID" -c config/kraft/server.properties --standalone
-java -cp "$CP" kafka.Kafka config/kraft/server.properties      # broker on localhost:9092
+cp .env.example .env          # add a model key
+docker compose up --build     # web on :3000, API docs on :8000/docs
 ```
 
-Then start the backend with `EVENT_BUS=kafka KAFKA_BOOTSTRAP_SERVERS=localhost:9092`. To split the roles, run one process each with `RUN_MODE=api` (`scripts/serve.py`), `RUN_MODE=worker` and `RUN_MODE=projector` (`python -m app.workers`), all pointing at the same database and broker, plus `REDIS_URL` so SSE fan-out crosses processes.
+Starts Postgres (pgvector), Redis, Kafka (KRaft), a migration job, the API, the worker, the projector and the web app.
+
+---
+
+## Choose a model
+
+Set these in `backend/.env` (or as Vercel environment variables). Embeddings run locally on CPU by default, so the knowledge base needs no key at all.
+
+| Provider | Settings |
+|---|---|
+| **Google Gemini** (free tier works) | `LLM_PROVIDER=google` · `LLM_MODEL=gemini-3.5-flash-lite` · `GOOGLE_API_KEY=…` |
+| OpenAI | `LLM_PROVIDER=openai` · `LLM_MODEL=gpt-4.1-mini` · `OPENAI_API_KEY=…` |
+| Anthropic | `LLM_PROVIDER=anthropic` · `LLM_MODEL=claude-sonnet-5-5` · `ANTHROPIC_API_KEY=…` |
+| Ollama (local, free) | `LLM_PROVIDER=ollama` · `LLM_MODEL=qwen2.5:7b` |
+
+A three-agent run with `gemini-3.5-flash-lite` uses about 5,000 tokens. If no provider is usable, the app says so on Settings and in the Run dialog instead of faking output.
+
+Guards, all configurable in `.env.example`: run timeout, per-step timeout and retries, revision caps, a token budget per run, concurrent runs, upload size, and allowlists for the web and webhook tools.
+
+---
+
+## Tech stack
+
+| Layer | Built with |
+|---|---|
+| **Web** | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · React Flow · TanStack Query · GSAP · cmdk |
+| **API** | FastAPI · Pydantic v2 · SQLAlchemy 2 (async) · Alembic · structlog · Server-Sent Events |
+| **Agents** | LangGraph (state graph, Postgres checkpointer, `interrupt()` approvals) · LangChain `init_chat_model` |
+| **Retrieval** | PostgreSQL + pgvector (HNSW) · full-text search · Reciprocal Rank Fusion · fastembed `bge-small-en-v1.5` |
+| **Events** | Transactional outbox · Kafka (KRaft) or in-process bus · idempotent consumers · dead-letter queue · Redis pub/sub |
+| **Hosting** | Vercel Services · Neon · Upstash, or Docker Compose |
+
+---
+
+## Project layout
+
+```
+NEXUS/
+├── web/                     Next.js app
+│   ├── src/app/             landing page, auth, /app screens
+│   ├── src/components/      dock, builder, run views, landing scenes, UI primitives
+│   └── e2e/                 Playwright journeys and the screenshot harness
+├── backend/                 FastAPI + LangGraph
+│   ├── app/agents/          the four agents, prompts, LLM client
+│   ├── app/orchestration/   canvas graph → LangGraph compiler and validation
+│   ├── app/rag/             parsing, chunking, embeddings, hybrid retrieval
+│   ├── app/events/          outbox, buses, consumers, pub/sub
+│   ├── app/workers/         run executor, projector, command handling
+│   ├── migrations/          Alembic
+│   └── tests/               pytest suite
+├── docs/                    architecture, samples, screenshots
+├── vercel.json              Vercel Services: web + api
+├── docker-compose.yml
+└── DEPLOY.md
+```
 
 ---
 
 ## Tests
 
 ```bash
-cd backend && uv run pytest -q                 # 31 tests: auth, graph compiler, RAG, runs/events (~20 s)
+cd backend && uv run pytest -q        # 34 tests: auth, graph compiler, RAG, runs, events, serverless mode
+cd web && npx playwright test         # 12 browser journeys (start scripts/e2e_server.py and the web app first)
 ```
 
-The backend tests use `TEST_DATABASE_URL` when set, otherwise the embedded Postgres (a fresh `nexus_test` database each session), and a fake chat model defined in `tests/fakes.py`.
-
-End-to-end (Playwright, 10 user journeys: register, sign in, upload and search documents, cited answers, build and save a workflow, a live multi-agent run, replay, approval of a destructive action, events through the bus, ⌘K palette):
-
-```bash
-cd backend && uv run python scripts/e2e_server.py   # real API on :8000 with a deterministic test LLM, fresh nexus_e2e database
-cd web && npx next dev -p 3000
-cd web && npx playwright test
-```
-
-`scripts/e2e_server.py` swaps in one test double, an extractive model that builds answers from the retrieved passages (`tests/extractive_llm.py`), so the journeys are deterministic and need no key. Everything else is production code: Postgres, pgvector, local embeddings, LangGraph, the outbox, the consumers and SSE. Add `EVENT_BUS=kafka KAFKA_BOOTSTRAP_SERVERS=localhost:9092` to run the same journeys over a real broker.
-
-Screenshots in `docs/screenshots/` are made by the same harness: `SHOTS=1 npx playwright test e2e/screenshots.spec.ts`.
+The backend tests run against a real Postgres with pgvector, real LangGraph and the real outbox and consumers; only the chat model is scripted. The Playwright journeys cover registering, signing in, uploading and searching documents, cited answers, building and saving a workflow, a live multi-agent run, replay, approving a destructive action, the event pipeline and the ⌘K palette. They run against `scripts/e2e_server.py`, the real API with a deterministic test model, so they need no key.
 
 ---
 
-## Screenshots
+## Honest notes
 
-Captured with the e2e harness. Agent text in these images comes from the extractive **test double**, not from a real LLM.
-
-| | |
-|---|---|
-| ![Landing](docs/screenshots/01-landing-hero.png) Landing: the hero replays a recorded run in the real canvas | ![Board](docs/screenshots/04-landing-board.png) Landing: the run board |
-| ![Overview](docs/screenshots/13-overview.png) Overview: real metrics and a live activity stream | ![Workflows](docs/screenshots/07-workflows.png) Workflows |
-| ![Builder](docs/screenshots/10-builder-run-done.png) Builder after a finished run | ![Run detail](docs/screenshots/11-run-detail.png) Run detail with step timeline and replay |
-| ![Approval](docs/screenshots/12-approval.png) Human-in-the-loop approval | ![Knowledge](docs/screenshots/06-knowledge.png) Knowledge base with live ingest status |
-| ![Monitoring](docs/screenshots/15-monitoring.png) Monitoring: latency, failures, Kafka lane, DLQ | ![Playground](docs/screenshots/16-playground.png) Agent playground with tool calls and citations |
-| ![Command palette](docs/screenshots/18-command-palette.png) ⌘K palette | ![Mobile](docs/screenshots/19-mobile-overview.png) Overview on a phone |
-
-All 20 are in [`docs/screenshots/`](docs/screenshots/).
-
----
-
-## Design notes
-
-- **Spectrum.** The interface is monochrome (black, white, greys). Colour has one job: each agent owns a hue (Research cyan, Analyst indigo, Execution pink, Reviewer amber), and every gradient is those four agents handing work on. The logo's four nodes wear the same colours, and a running node, bar or step glows in its agent's colour.
-- **The dock.** Navigation is a small glass dock at the bottom of every page. Icons magnify under the pointer (GSAP `quickTo`), a spectrum bar slides to the current place, and on phones it becomes a regular tab bar. On the landing page it follows the section you are reading.
-- **Glass on the floating layer** (dock, top bar, menus, ⌘K, sheets, the hero run card), with a `prefers-reduced-transparency` fallback.
-- **Motion (GSAP).** SplitText headline, a pinned scroll scene where the logo's N draws itself through the four agents (DrawSVG + ScrollTrigger), a sideways pipeline scroll, Flip tab highlights and batched entrances. Everything is visible without JavaScript and with `prefers-reduced-motion`.
-- **Type.** Geist throughout; Geist Mono only for figures, IDs and payloads inside the app.
-- **The run is the interface.** The landing hero is a recorded run replayed with the real canvas parts.
-
----
-
-## Deploying
-
-See **[DEPLOY.md](DEPLOY.md)**: one Vercel project (Next.js + FastAPI as services, agents on Vercel Queues), Postgres on Neon and Redis on Upstash, all on free tiers. Docker Compose remains the self-hosted option.
-
----
-
-## Project status and honest notes
-
-- **Verified here:** 33 backend tests (including the serverless path, `RUN_MODE=serverless`); 12/12 Playwright tests; `next build`; Playwright on a real Kafka 3.9.1 broker in an earlier round.
-- **Real model output:** verified with Google Gemini (`gemini-3.5-flash-lite`, free tier): the Research brief workflow over the sample supplier contract succeeded in 78 s for about 5k tokens, reviewer approved. Screenshots in `docs/screenshots/` still come from the deterministic test model.
-- **Not verified here:** a Vercel deployment and `docker compose up` (no Docker on the development machine). Both are written and documented.
-- **Sample content to replace before launch:** the fictional documents in `docs/samples/`, the landing board rows and hero traces (`web/src/components/landing/traces.ts`, `BOARD` in `sections.tsx`), and the run fragment on the auth pages.
-- Archival photographs on the landing page are credited in `web/public/archive/credits.json` and in the footer.
+- The live demo runs on free tiers (Vercel Hobby, Neon, Upstash, Gemini free tier). The first request after a quiet period is slow while the serverless function starts, and runs must finish within Vercel Hobby's 5-minute function limit.
+- On Vercel a run executes inside its live stream, so it runs while its page is open. If you close the page mid-run, it resumes from its last checkpoint the next time anyone opens it.
+- The sample documents in `docs/samples/` and the landing page's example runs are fictional.
+- Archival photographs on the landing page are credited in the footer and in `web/public/archive/credits.json`.

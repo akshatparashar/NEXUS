@@ -19,18 +19,20 @@ Two supported ways:
 browser ──► vercel.app ──┬─ /api/*, /docs ─► service "api"  (FastAPI, RUN_MODE=serverless)
                          └─ everything else ► service "web"  (Next.js)
 
-POST /runs ─► run row + command written in one transaction (outbox)
-           └► the same request publishes the command and runs it in that function,
-              kept alive after the response by Vercel's wait_until (up to maxDuration)
+POST /runs ─► run row + start command written in one transaction (outbox)
+GET  /runs/{id}/stream (the run page opens it at once)
+           └► this request takes the run's pending command and executes it while streaming
               ├► lifecycle events → projector, inline → Postgres (event log + run views)
               └► streamed tokens → Upstash Redis pub/sub → SSE in any API instance
+POST /documents ─► the document is parsed, chunked and embedded before the request returns
 ```
 
-- **No background processes.** Each request flushes its own outbox rows and runs the commands it
-  produced (`COMMAND_QUEUE=inline`, the default); a run whose function died is re-queued the next time
-  someone opens it. `COMMAND_QUEUE=vercel` hands commands to Vercel Queues instead, but note that a
-  `[[tool.vercel.subscribers]]` consumer was not generated inside a Services-framework FastAPI service
-  when this was first deployed, so inline is the tested path.
+- **Work only happens inside open requests** (`COMMAND_QUEUE=stream`, the default). Vercel's Python
+  runtime does not run tasks after a response is sent (`wait_until` included, in our tests), so uploads
+  and cancels finish before their request returns, and a run executes inside its own live stream. A
+  second viewer of the same run finds nothing to take; if the viewer leaves mid-run, the next one
+  resumes it from its last checkpoint. (`COMMAND_QUEUE=vercel` targets Vercel Queues, but its
+  `[[tool.vercel.subscribers]]` consumer was not generated inside a Services FastAPI service.)
 - **Durable.** Runs checkpoint to Postgres after every step, so a re-queued run resumes, it does not restart.
 - **Approvals** pause the run and end the function; the decision queues a `resume` command.
 - **Cancelling** a run marks it cancelled; the instance running it notices within 5 seconds and stops.
@@ -101,8 +103,8 @@ the event log), but text no longer streams word by word.
 
 ## Limits to know
 
-- **Run length.** One function call runs a run, so a run must finish inside the function limit
-  (300 s on Hobby). `RUN_TIMEOUT_SECONDS` fails it cleanly first; *Retry* continues from the last checkpoint.
+- **Run length.** A run executes inside its stream request, so it must finish inside the function
+  limit (300 s on Hobby) and runs while its page is open. `RUN_TIMEOUT_SECONDS` fails it cleanly first; *Retry* continues from the last checkpoint.
 - **Uploads** up to about 4 MB each on Vercel.
 - **Ollama** (local models) needs a machine of your own: use Docker Compose for that.
 - **Local embeddings** download about 130 MB into `/tmp` on each cold start; `EMBEDDING_PROVIDER=openai`
