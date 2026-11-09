@@ -53,10 +53,14 @@ async def flush() -> None:
     for _ in range(20):
         try:
             if await relay_once() == 0:
-                return
+                break
         except Exception:
             log.exception("outbox_flush_failed")
             return
+    bus = get_bus()
+    run_deferred = getattr(bus, "run_deferred", None)
+    if run_deferred is not None:
+        await run_deferred()
 
 
 async def relay_once(batch: int = 200) -> int:

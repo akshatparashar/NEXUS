@@ -12,13 +12,14 @@ the at-least-once contract is the same either way.
 
 import asyncio
 import contextlib
+import json
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.events.envelope import ALL_TOPICS, COMMANDS, LIFECYCLE
+from app.events.envelope import ALL_TOPICS, COMMANDS, LIFECYCLE, RUN_REQUESTED, RUN_RESUME
 
 log = get_logger(__name__)
 
@@ -224,6 +225,7 @@ class ServerlessBus(MessageBus):
         self.stats: dict[str, TopicStats] = defaultdict(TopicStats)
         self._projector = None
         self._inline_tasks: set[asyncio.Task] = set()
+        self._deferred: list[bytes] = []  # COMMAND_QUEUE=stream: run after the outbox transaction
 
     async def publish(self, topic: str, key: str, value: bytes) -> None:
         self.stats[topic].produced += 1
@@ -239,9 +241,12 @@ class ServerlessBus(MessageBus):
             log.warning("serverless_bus_unrouted", topic=topic, key=key)
 
     async def _send_command(self, key: str, value: bytes) -> None:
-        import json
-
         s = get_settings()
+        if s.command_queue == "stream":
+            if json.loads(value).get("type") in (RUN_REQUESTED, RUN_RESUME):
+                return  # executed by the run's live stream (app.workers.vercel_queue.drive_run)
+            self._deferred.append(value)  # ingest, cancel: finished before this request returns
+            return
         if s.command_queue == "inline":
             from app.workers.vercel_queue import handle_command
 
@@ -255,8 +260,15 @@ class ServerlessBus(MessageBus):
         payload = json.loads(value)
         await send(s.queue_topic, payload, idempotency_key=payload.get("event_id"))
 
+    async def run_deferred(self) -> None:
+        """Execute commands deferred by COMMAND_QUEUE=stream, outside the outbox transaction."""
+        from app.workers.vercel_queue import handle_command
+
+        while self._deferred:
+            await handle_command(self._deferred.pop(0))
+
     async def subscribe(self, topics: list[str], group: str, handler: Handler) -> None:
-        raise RuntimeError("ServerlessBus has no long-lived consumers; commands arrive through Vercel Queues")
+        raise RuntimeError("ServerlessBus has no long-lived consumers")
 
     async def join(self) -> None:
         """Test helper: wait for commands running inline."""

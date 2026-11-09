@@ -140,10 +140,31 @@ async def stream_run(
     # serverless: the run may be executing in another instance, so lifecycle events are also read
     # from the event log; and a run whose worker vanished is queued again here
     poll_log = get_settings().serverless
+    # COMMAND_QUEUE=stream: this request is where the run executes (serverless hosts only do work
+    # while a request is open). The driver takes the run's pending commands; a second viewer finds
+    # nothing to take, and a run whose viewer left is resumed from its checkpoint by the next one.
+    drives = poll_log and get_settings().command_queue == "stream"
     if poll_log and not already_done:
         await run_service.kick_if_stale(run_id)
 
     async def gen():
+        driver: asyncio.Task | None = None
+
+        def drive() -> None:
+            nonlocal driver
+            if drives and not already_done and (driver is None or driver.done()):
+                from app.workers.vercel_queue import drive_run
+
+                driver = asyncio.create_task(drive_run(run_id))
+
+        try:
+            async for item in _stream(drive):
+                yield item
+        finally:
+            if driver is not None and not driver.done():
+                driver.cancel()  # the lease stays; the next viewer resumes from the checkpoint
+
+    async def _stream(drive):
         last = start_after
         async with get_pubsub().subscription(run_channel(run_id)) as sub:
             async with session_scope() as s:
@@ -162,11 +183,13 @@ async def stream_run(
             if finished and already_done:
                 yield {"event": "end", "data": "{}"}
                 return
+            drive()
             while not await request.is_disconnected():
                 msg = await sub.get(timeout=1.5 if poll_log else 15)
                 if msg is None:
                     if not poll_log:
                         continue
+                    drive()  # picks up a resume after an approval, or a recovery
                     async with session_scope() as s:
                         rows = (
                             await s.execute(

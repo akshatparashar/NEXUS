@@ -33,10 +33,46 @@ def _get_consumer() -> CommandConsumer:
     return _consumer
 
 
-async def handle_command(raw: bytes | dict[str, Any]) -> None:
-    """Run one command envelope (bytes as stored in the outbox, or its decoded JSON)."""
-    value = raw if isinstance(raw, bytes) else json.dumps(raw).encode()
+async def handle_command(raw: bytes | str | dict[str, Any]) -> None:
+    """Run one command envelope: bytes or a JSON string as stored in the outbox, or its decoded dict."""
+    if isinstance(raw, bytes):
+        value = raw
+    elif isinstance(raw, str):
+        value = raw.encode()
+    else:
+        value = json.dumps(raw).encode()
     await _get_consumer()(COMMANDS, value)
+
+
+async def drive_run(run_id: Any, max_commands: int = 5) -> None:
+    """COMMAND_QUEUE=stream: execute this run's not-yet-processed commands, in order, right here.
+
+    Called from the run's live stream. Duplicates are harmless: the consumer ledger lets one caller
+    take a command, and the run lease stops two processes executing one run.
+    """
+    from sqlalchemy import text
+
+    from app.database.session import session_scope
+
+    tried: set[str] = set()
+    for _ in range(max_commands):
+        async with session_scope() as s:
+            rows = (
+                await s.execute(
+                    text(
+                        "SELECT o.event_id::text AS id, o.payload FROM outbox o "
+                        "WHERE o.topic = :topic AND o.key = :key AND NOT EXISTS ("
+                        "  SELECT 1 FROM processed_events p WHERE p.consumer = :consumer AND p.event_id = o.event_id"
+                        ") ORDER BY o.id"
+                    ),
+                    {"topic": COMMANDS, "key": str(run_id), "consumer": CommandConsumer.name},
+                )
+            ).all()
+        pending = [r for r in rows if r.id not in tried]
+        if not pending:
+            return
+        tried.add(pending[0].id)
+        await handle_command(pending[0].payload)
 
 
 try:  # the Vercel SDK is only needed where the queue exists
