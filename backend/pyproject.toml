@@ -1,0 +1,57 @@
+[project]
+name = "nexus-backend"
+version = "0.1.0"
+description = "NEXUS AI — agentic workflow platform backend"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "pydantic-settings>=2.6",
+  "email-validator>=2.2",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "asyncpg>=0.30",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.14",
+  "pgvector>=0.3.6",
+  "pyjwt>=2.10",
+  "argon2-cffi>=23.1",
+  "python-multipart>=0.0.17",
+  "structlog>=24.4",
+  "redis>=5.2",
+  "aiokafka>=0.12",
+  "langgraph>=0.2.60",
+  "langgraph-checkpoint-postgres>=2.0",
+  "langchain>=0.3",
+  "langchain-core>=0.3",
+  "langchain-openai>=0.2",
+  "langchain-anthropic>=0.3",
+  "langchain-ollama>=0.2",
+  "pypdf>=5.1",
+  "tiktoken>=0.8",
+  "fastembed>=0.4",
+  "httpx>=0.28",
+  "sse-starlette>=2.1",
+  "tenacity>=9.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pgserver>=0.1.4",
+  "ruff>=0.8",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.uv]
+package = false

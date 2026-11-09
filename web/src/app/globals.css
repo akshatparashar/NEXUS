@@ -1,0 +1,412 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────────────────────────
+   NEXUS design tokens — "Instrument"
+   App style: data-terminal (dark). Graphite ground, cards one step darker, colour on data only.
+   Every selection is a 1px accent line. Violet means exactly one thing: an LLM is generating now.
+   Glass appears only on the floating layer (menus, palette, sheets, toasts, canvas overlays).
+   ────────────────────────────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+
+  --ground: #171719;
+  --surface: #131217; /* cards sit darker than the ground */
+  --raised: #212023; /* nested panels, hover */
+  --well: #101013; /* builder canvas */
+  --active: #26252a;
+  --border: #222224;
+  --rule: #1b1a1f;
+  --control: #3a3a3e;
+  --control-hover: #4a4a50;
+
+  --text: #f2f2f3;
+  --muted: #8a8c92; /* 5.3:1 on --surface */
+
+  --accent: #4c8dff; /* electric blue: selection + the one primary data hue */
+  --accent-ink: #7fadff;
+  --thinking: #a88bfa; /* signal only: a model is generating right now */
+  --positive: #44a282;
+  --negative: #e5566f;
+  --warning: #d9a441;
+
+  --pill-positive-bg: #1b2828;
+  --pill-positive-ink: #5fc39c;
+  --pill-negative-bg: #2c1a20;
+  --pill-negative-ink: #ef7a8e;
+  --pill-warning-bg: #2a2416;
+  --pill-warning-ink: #e0b25c;
+  --pill-neutral-bg: #212023;
+  --pill-neutral-ink: #bdbdc0;
+  --pill-thinking-bg: #221d33;
+  --pill-thinking-ink: #c1abff;
+  --pill-accent-bg: #172238;
+  --pill-accent-ink: #8db6ff;
+
+  /* agent identity tints (builder node-type tiles; never used for status) */
+  --agent-research: #7eb6c8;
+  --agent-analyst: #c8b27e;
+  --agent-execution: #cc9a82;
+  --agent-reviewer: #a9b1bd;
+
+  --grid: #2b2a30;
+  --chart-1: #f2f2f3;
+
+  --glass: rgb(28 27 32 / 0.72);
+  --glass-strong: rgb(24 23 28 / 0.86);
+  --glass-edge: rgb(255 255 255 / 0.07);
+  --float-shadow: 0 18px 48px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3);
+  --card-shadow: 0 12px 28px rgb(0 0 0 / 0.2);
+
+  --radius-card: 6px;
+  --radius-panel: 10px;
+  --radius-control: 999px;
+  --radius-field: 6px;
+
+  --gap: 24px;
+  --pad: 32px;
+  --row: 42px;
+  --control-h: 34px;
+  --rail: 56px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 140ms;
+  --t-med: 240ms;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-well: var(--well);
+  --color-active: var(--active);
+  --color-border: var(--border);
+  --color-rule: var(--rule);
+  --color-control: var(--control);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-thinking: var(--thinking);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-public-sans), Inter, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+}
+
+/* element defaults live in the base layer so Tailwind utilities always win over them */
+@layer base {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgb(76 141 255 / 0.35);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+}
+
+/* tabular figures on every number that updates */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ── the floating layer (the only place glass is allowed) ── */
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--float-shadow);
+}
+.glass-strong {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--float-shadow);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-strong {
+    background: var(--raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* ── thinking: violet pulse on whatever is generating ── */
+@keyframes nexus-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes nexus-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes nexus-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes nexus-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--thinking);
+  animation: nexus-breathe 1.4s var(--ease) infinite;
+}
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--thinking);
+  animation: nexus-caret 1s steps(1) infinite;
+}
+.rise {
+  animation: nexus-rise var(--t-med) var(--ease) both;
+}
+
+/* scrollbars that recede */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #333238 transparent;
+  }
+}
+
+/* Markdown rendered from agent output */
+.prose-agent {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--text);
+}
+.prose-agent p {
+  margin: 0 0 10px;
+}
+.prose-agent p:last-child {
+  margin-bottom: 0;
+}
+.prose-agent ul,
+.prose-agent ol {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+.prose-agent li {
+  margin: 2px 0;
+}
+.prose-agent strong {
+  font-weight: 600;
+}
+.prose-agent h1,
+.prose-agent h2,
+.prose-agent h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+.prose-agent code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--raised);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.prose-agent a {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+.prose-agent table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.prose-agent th,
+.prose-agent td {
+  border-bottom: 1px solid var(--rule);
+  padding: 4px 10px 4px 0;
+  text-align: left;
+}
+
+/* React Flow, restyled to the instrument */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: #4a4a50;
+  --xy-edge-stroke-selected: var(--accent);
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: var(--accent);
+  --xy-handle-background-color: var(--surface);
+  --xy-handle-border-color: #5a5a62;
+  --xy-node-boxshadow-selected: none;
+  --xy-selection-background-color: rgb(76 141 255 / 0.08);
+  --xy-selection-border: 1px solid rgb(76 141 255 / 0.5);
+  --xy-controls-button-background-color: transparent;
+  --xy-minimap-background-color: var(--surface);
+  --xy-attribution-background-color: transparent;
+}
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__handle {
+  border-radius: 999px;
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.react-flow__handle:hover {
+  border-color: var(--accent);
+  transform: scale(1.25);
+}
+.react-flow__edge.running path.react-flow__edge-path {
+  stroke: var(--thinking);
+  stroke-dasharray: 6 6;
+  animation: nexus-dash 0.6s linear infinite;
+}
+.react-flow__edge.done path.react-flow__edge-path {
+  stroke: #6a6a72;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── landing motion ──────────────────────────────────────────────────────────────
+   Signature: each headline line rises from behind its own baseline. Everything else
+   is a short staggered rise as it enters. Content is visible without JavaScript. */
+.mask-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.06em;
+}
+.mask-line > span {
+  display: block;
+  animation: nexus-mask 900ms var(--ease-out-strong) both;
+}
+@keyframes nexus-mask {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: none;
+  }
+}
+.fade-up {
+  animation: nexus-fade-up 700ms var(--ease-out-strong) both;
+}
+@keyframes nexus-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 700ms var(--ease-out-strong),
+    transform 700ms var(--ease-out-strong);
+  transition-delay: var(--d, 0ms);
+}
+.reveal-ready [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-ready [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+  .mask-line > span,
+  .fade-up {
+    animation: none;
+  }
+}
+
+/* the page sets every figure in the text face; monospace stays inside the app */
+.landing .num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+@keyframes nexus-drift {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06) translate(-1%, -1%);
+  }
+}
+.drift {
+  animation: nexus-drift 14s ease-in-out infinite alternate;
+}

@@ -1,0 +1,152 @@
+# NEXUS AI — the full stack.
+#   cp .env.example .env      # add OPENAI_API_KEY (or ANTHROPIC_API_KEY, or use the ollama profile)
+#   docker compose up --build
+# Web: http://localhost:3000 · API docs: http://localhost:8000/docs
+#
+# Free and local:  docker compose --profile ollama up --build
+#   then: docker compose exec ollama ollama pull qwen2.5:7b   (and set LLM_PROVIDER=ollama in .env)
+
+name: nexus
+
+x-backend: &backend
+  build: ./backend
+  image: nexus-backend:local
+  env_file:
+    - path: .env
+      required: false
+  environment: &backend-env
+    DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
+    REDIS_URL: redis://redis:6379/0
+    EVENT_BUS: kafka
+    KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    OLLAMA_BASE_URL: http://ollama:11434
+    LOG_JSON: "true"
+    CORS_ORIGINS: '["http://localhost:3000"]'
+  volumes:
+    - uploads:/data/uploads
+    - models:/data/models
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    kafka: { condition: service_healthy }
+    migrate: { condition: service_completed_successfully }
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus
+      POSTGRES_DB: nexus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.9.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports: ["29092:29092"]
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 15s
+
+  migrate:
+    build: ./backend
+    image: nexus-backend:local
+    env_file:
+    - path: .env
+      required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nexus:nexus@postgres:5432/nexus
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  # HTTP API + SSE + outbox relay
+  api:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      RUN_MODE: api
+    ports: ["8000:8000"]
+
+  # consumes nexus.commands: runs LangGraph workflows and ingests documents
+  worker:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      RUN_MODE: worker
+    command: ["python", "-m", "app.workers"]
+    healthcheck:
+      disable: true
+
+  # consumes nexus.lifecycle: event log, read models, realtime fan-out
+  projector:
+    <<: *backend
+    environment:
+      <<: *backend-env
+      RUN_MODE: projector
+    command: ["python", "-m", "app.workers"]
+    healthcheck:
+      disable: true
+
+  web:
+    build:
+      context: ./web
+      args:
+        API_URL: http://api:8000
+    environment:
+      API_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama:/root/.ollama
+    ports: ["11434:11434"]
+
+volumes:
+  pgdata:
+  kafkadata:
+  uploads:
+  models:
+  ollama:
