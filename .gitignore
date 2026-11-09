@@ -26,4 +26,5 @@ web/tsconfig.tsbuildinfo
 
 # local credential files (deploy settings); keep the template
 .env.*
+.env*
 !.env.example
