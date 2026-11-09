@@ -77,7 +77,7 @@ the event log), but text no longer streams word by word.
 | `JWT_SECRET` | `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `LLM_PROVIDER` / `LLM_MODEL` | `google` / `gemini-3.5-flash-lite` (free tier), `openai` / `gpt-4.1-mini`, or `anthropic` / `claude-sonnet-5-5` |
 | `GOOGLE_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` | your key for that provider |
-| `EMBEDDING_PROVIDER` | `local` plus `MODEL_CACHE_DIR=/tmp/models` (free, no key), or `openai` (needs `OPENAI_API_KEY`) |
+| `EMBEDDING_PROVIDER` | `google` (uses `GOOGLE_API_KEY`, recommended) or `openai`. Not `local`: the model download fails on Vercel |
 | `UPLOAD_STORAGE` | `database` |
 | `MAX_UPLOAD_MB` | `4` (Vercel caps request bodies at 4.5 MB) |
 | `RUN_TIMEOUT_SECONDS` | `270` on Hobby (functions stop at 300 s); up to `780` on Pro |
@@ -107,8 +107,8 @@ the event log), but text no longer streams word by word.
   limit (300 s on Hobby) and runs while its page is open. `RUN_TIMEOUT_SECONDS` fails it cleanly first; *Retry* continues from the last checkpoint.
 - **Uploads** up to about 4 MB each on Vercel.
 - **Ollama** (local models) needs a machine of your own: use Docker Compose for that.
-- **Local embeddings** download about 130 MB into `/tmp` on each cold start; `EMBEDDING_PROVIDER=openai`
-  avoids that. Changing provider later means re-processing documents (same 384 dimensions, different vectors).
+- **Embeddings** must come from an API on Vercel (`google` or `openai`); the local model cannot be
+  downloaded there. Changing provider later means re-processing documents (same 384 dimensions, different vectors).
 
 ## Testing the serverless path locally
 

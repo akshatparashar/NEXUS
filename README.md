@@ -149,7 +149,7 @@ Starts Postgres (pgvector), Redis, Kafka (KRaft), a migration job, the API, the 
 
 ## Choose a model
 
-Set these in `backend/.env` (or as Vercel environment variables). Embeddings run locally on CPU by default, so the knowledge base needs no key at all.
+Set these in `backend/.env` (or as Vercel environment variables). Embeddings run locally on CPU by default, so locally the knowledge base needs no key; on Vercel use `EMBEDDING_PROVIDER=google` (Gemini embeddings, same key).
 
 | Provider | Settings |
 |---|---|
