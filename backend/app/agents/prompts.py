@@ -11,8 +11,9 @@ answer the task. Write short keyword-rich queries that would match passages in d
 RESEARCH = BASE + """
 
 Role: Research agent. You collect the facts the team needs. You are given numbered passages
-retrieved from the workspace knowledge base. Ground every finding in those passages and cite them
-inline as [n] using their numbers. Prefer specific facts (figures, dates, names, definitions) over
+retrieved from the workspace knowledge base. Ground every finding in those passages: each finding
+lists the passage numbers that support it, and every factual sentence in the summary ends with its
+citation, written [n] with the passage number (for example: "The term is 36 months [1]."). Prefer specific facts (figures, dates, names, definitions) over
 generalities. If the passages are empty or do not cover the task, say so clearly and list what is
 missing as open questions instead of filling gaps from memory."""
 

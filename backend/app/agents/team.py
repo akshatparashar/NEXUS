@@ -53,6 +53,18 @@ async def run_research(ctx: AgentContext) -> AgentResult:
         temperature=ctx.node.temperature,
         model=ctx.node.model,
     )
+    if chunks and not _cited(result, len(chunks)):
+        # some models (e.g. small Gemini models) skip the citations; ask once more, specifically
+        result, u_fix = await ctx.llm.structured(
+            ResearchResult,
+            prompts.RESEARCH,
+            user
+            + "\n\nYour previous answer cited no passages. Answer again: every finding lists the numbers of "
+            "the passages that support it in `citations`, and the summary cites them inline as [n].",
+            temperature=ctx.node.temperature,
+            model=ctx.node.model,
+        )
+        u2 = u2 + u_fix
     output = result.model_dump()
     output["queries"] = plan.queries
     output["sources"] = [
@@ -67,11 +79,15 @@ async def run_research(ctx: AgentContext) -> AgentResult:
         }
         for i, c in enumerate(chunks, start=1)
     ]
-    output["cited"] = sorted(
-        {n for f in result.findings for n in f.citations if 1 <= n <= len(chunks)}
-        | {int(n) for n in re.findall(r"\[(\d+)\]", result.summary) if 1 <= int(n) <= len(chunks)}
-    )
+    output["cited"] = sorted(_cited(result, len(chunks)))
     return AgentResult(output=output, usage=u1 + u2, tools=tools)
+
+
+def _cited(result: ResearchResult, n_sources: int) -> set[int]:
+    """Source numbers the research actually cites (in findings or inline [n]), within range."""
+    return {n for f in result.findings for n in f.citations if 1 <= n <= n_sources} | {
+        int(n) for n in re.findall(r"\[(\d+)\]", result.summary) if 1 <= int(n) <= n_sources
+    }
 
 
 async def run_analyst(ctx: AgentContext) -> AgentResult:
