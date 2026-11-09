@@ -9,7 +9,7 @@
 NEXUS turns a graph you draw on a canvas into a team of AI agents that research your documents,<br/>
 analyse what they find, act on it with your approval, and review their own work, live, step by step.
 
-**[Live demo](https://nexus-ai-worker.vercel.app)** · [Deploy your own](DEPLOY.md) · [Architecture](docs/architecture.md) · [API docs](https://nexus-ai-worker.vercel.app/docs)
+**[Live demo](https://nexus-ai-worker.vercel.app)** · [Deploy your own](#deploy-to-vercel-free-tiers) · [How it works](#how-a-run-works) · [API docs](https://nexus-ai-worker.vercel.app/docs)
 
 ![Next.js](https://img.shields.io/badge/Next.js_16-000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-20232a?logo=react&logoColor=61dafb)
@@ -100,8 +100,6 @@ The same code runs in three topologies, chosen by `RUN_MODE`:
 | **One process** (`embedded`) | API, worker and projector in one process with an in-memory bus. The easiest way to develop. |
 | **Docker Compose** (`api` / `worker` / `projector`) | Separate containers with Kafka between them, idempotent consumers, retries and a dead-letter queue. |
 
-More detail, delivery guarantees and a code map: **[docs/architecture.md](docs/architecture.md)**.
-
 <img src="docs/architecture.png" alt="Architecture diagram" width="100%" />
 
 ---
@@ -134,7 +132,26 @@ Register an account: your workspace starts with three ready workflows. Upload on
 
 ### Deploy to Vercel (free tiers)
 
-One Vercel project runs both the Next.js app and the FastAPI API as two services, with Postgres on Neon and Redis on Upstash. Step by step: **[DEPLOY.md](DEPLOY.md)**.
+One Vercel project runs both the Next.js app and the FastAPI API as two services (see `vercel.json`), with Postgres on [Neon](https://neon.tech) and Redis on [Upstash](https://upstash.com).
+
+1. Create a Neon project and copy its **direct** connection string (the host without `-pooler`). Create the schema from your machine: `cd backend && DATABASE_URL="postgresql://…?sslmode=require" uv run alembic upgrade head`.
+2. Create an Upstash Redis database and copy its `rediss://…` URL.
+3. Import the repository in Vercel, keeping the repository root as the root directory.
+4. Add the environment variables below, then deploy. Check `https://<your-app>.vercel.app/api/v1/health`.
+
+| Variable | Value |
+|---|---|
+| `RUN_MODE` | `serverless` |
+| `DATABASE_URL` / `REDIS_URL` | from Neon and Upstash |
+| `JWT_SECRET` | a long random string |
+| `LLM_PROVIDER` / `LLM_MODEL` / `GOOGLE_API_KEY` | `google` / `gemini-3.5-flash-lite` / your key |
+| `EMBEDDING_PROVIDER` | `google` (the local model cannot be downloaded on Vercel) |
+| `UPLOAD_STORAGE` / `MAX_UPLOAD_MB` | `database` / `4` |
+| `RUN_TIMEOUT_SECONDS` / `TOKEN_FLUSH_MS` | `270` / `120` |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | `3` / `2` |
+| `COOKIE_SECURE` / `ENVIRONMENT` | `true` / `production` |
+
+Every push to `main` then redeploys automatically.
 
 ### Docker Compose
 
@@ -195,8 +212,7 @@ NEXUS/
 │   └── tests/               pytest suite
 ├── docs/                    architecture, samples, screenshots
 ├── vercel.json              Vercel Services: web + api
-├── docker-compose.yml
-└── DEPLOY.md
+└── docker-compose.yml
 ```
 
 ---

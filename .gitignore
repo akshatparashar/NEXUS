@@ -28,3 +28,13 @@ web/tsconfig.tsbuildinfo
 .env.*
 .env*
 !.env.example
+
+# documentation: only README.md is published (sample documents used by the tests stay)
+*.md
+!/README.md
+!docs/samples/*.md
+*.pdf
+*.docx
+*.mp4
+*.mov
+explainer/
